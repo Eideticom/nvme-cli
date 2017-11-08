@@ -17,11 +17,8 @@
 
 #include <stdbool.h>
 #include <stdint.h>
-<<<<<<< HEAD
 #include <endian.h>
-=======
 #include <dirent.h>
->>>>>>> eid-nvme: Add vendor specific commands for Eideticom
 #include "plugin.h"
 #include "json.h"
 
