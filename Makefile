@@ -51,7 +51,8 @@ PLUGIN_OBJS :=					\
 	plugins/micron/micron-nvme.o		\
 	plugins/seagate/seagate-nvme.o 		\
 	plugins/virtium/virtium-nvme.o		\
-	plugins/shannon/shannon-nvme.o
+	plugins/shannon/shannon-nvme.o		\
+	plugins/eideticom/eid-nvme.o
 
 nvme: nvme.c nvme.h $(OBJS) $(PLUGIN_OBJS) NVME-VERSION-FILE
 	$(CC) $(CPPFLAGS) $(CFLAGS) nvme.c -o $(NVME) $(OBJS) $(PLUGIN_OBJS) $(LDFLAGS)
