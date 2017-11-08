@@ -1690,7 +1690,7 @@ static int list_subsys(int argc, char **argv, struct command *cmd,
 	return ret;
 }
 
-static int get_nvme_info(int fd, struct list_item *item, const char *node)
+int get_nvme_info(int fd, struct list_item *item, const char *node)
 {
 	int err;
 
@@ -1713,7 +1713,7 @@ static int get_nvme_info(int fd, struct list_item *item, const char *node)
 static const char *dev = "/dev/";
 
 /* Assume every block device starting with /dev/nvme is an nvme namespace */
-static int scan_dev_filter(const struct dirent *d)
+int scan_dev_filter(const struct dirent *d)
 {
 	char path[264];
 	struct stat bd;
