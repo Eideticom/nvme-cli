@@ -64,7 +64,7 @@ static void eid_print_list_item(struct list_item list_item)
 	struct eid_noload *eid =
 		(struct eid_noload *) &list_item.ns.vs;
 
-	printf("%-16s %-64.64s %-8.8u 0x%-8.8x\n", list_item.node,
+	printf("%-16s %-64.64s 0x%-8.8x 0x%-8.8x\n", list_item.node,
 	       eid->acc_name, (unsigned int) eid->acc_ver,
 	       (unsigned int) eid->acc_status);
 }
@@ -73,41 +73,63 @@ static void eid_print_list_items(struct list_item *list_items, unsigned int len)
 {
 	unsigned int i;
 
-	printf("%-16s %-64s %-8s %-10s\n",
+	printf("%-16s %-64s %-10s %-10s\n",
 	       "Node", "Accelerator Name", "Version", "Status");
-	printf("%-16s %-64s %-8s %-10s\n",
+	printf("%-16s %-64s %-10s %-10s\n",
 	       "----------------",
 	       "----------------------------------------------------------------",
-	       "--------", "----------");
+	       "----------", "----------");
 	for (i = 0 ; i < len ; i++)
 		eid_print_list_item(list_items[i]);
 }
 
 static void eid_show_nvme_id_ns_status(__le32 status)
 {
-	__u16 upper_rsvd = (status & 0xFFFE0000) >> 17;
-	__u16 lower_rsvd = (status & 0x000000F8) >> 3;
 	int as_en = status & 0x1;
 	int as_rdrdy = (status & 0x2) >> 1;
 	int as_wrrdy = (status & 0x4) >> 2;
-	__u8 as_err = (status & 0xFF00) >> 8;
-	int as_async = (status & 0x10000) >> 16;
+	__u8 lower_rsvd = (status & 0x000000F8) >> 3;
+	__u8 as_sc = (status & 0xFF00) >> 8;
+	int as_sen = (status & 0x10000) >> 16;
+	int as_bre = (status & 0x20000) >> 17;
+	int as_bwe = (status & 0x40000) >> 18;
+	__u8 as_inver = (status & 0x780000) >> 19;
+	__u8 upper_rsvd = (status & 0xFF800000) >> 23;
 
 	if (upper_rsvd)
-		printf("\t[31:17]\t: 0x%x\tReserved\n", upper_rsvd);
+		printf("\t[31:23]\t: 0x%x\tReserved\n", upper_rsvd);
 
-	printf("\t[16:16]\t: %#x\tAsync Event Request ", as_async);
-	if (as_async)
+  printf("\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
+
+  printf("\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
+  if (as_bwe)
+    printf("enabled ");
+  else
+    printf("NOT enabled ");
+  printf("(AS.BWE)\n");
+
+  printf("\t[17:17]\t: %d\tBlocking read functionality is ", as_bre);
+  if (as_bre)
+    printf("enabled ");
+  else
+    printf("NOT enabled ");
+  printf("(AS.BRE)\n");
+
+  printf("\t[16:16]\t: %d\tStatus code field is ", as_sen);
+	if (as_sen)
 		printf("enabled ");
 	else
 		printf("disabled ");
-	printf("(AS.ASYNC)\n");
+	printf("(AS.SEN)\n");
 
-	if (as_err)
-		printf("\t[15:8]\t: %d\tError 0x%x occurred ", as_err, as_err);
-	else
-		printf("\t[15:8]\t: %d\tNo errors have been reported ", as_err);
-	printf("(AS.ERR)\n");
+	if (as_sen) {
+    if (as_sc)
+		  printf("\t[15:8]\t: %d\tStatus code 0x%x occurred "
+          "(AS.SC)\n", as_sc, as_sc);
+	  else
+		  printf("\t[15:8]\t: %d\tNo status code has been "
+          "reported (AS.SC)\n", as_sc);
+  }
 
 	if (lower_rsvd)
 		printf("\t[7:3]\t: 0x%x\tReserved\n", lower_rsvd);
@@ -147,7 +169,7 @@ static void eid_show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
 	printf("acc_status\t: 0x%-8.8x\n", eid->acc_status);
 	if (human)
 		eid_show_nvme_id_ns_status(eid->acc_status);
-	printf("acc_version\t: %-8.8d\n", eid->acc_ver);
+	printf("acc_version\t: 0x%-8.8x\n", eid->acc_ver);
 	for (i = 0; i < 24/4; ++i)
 		printf("acc_cfg[%d]\t: 0x%-8.8x\n", i, eid->acc_cfg[i]);
 	printf("acc_spec_bytes\t: %d\n", eid->acc_priv_len);
