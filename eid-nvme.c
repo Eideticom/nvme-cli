@@ -42,13 +42,15 @@
 static const char *dev = "/dev/";
 
 struct eid_noload {
-	__le32           acc_status;
-	char             hls[12];
-	char             acc_name[64];
-	__le32           acc_ver;
-	__le32           acc_cfg[6];
-	__le32           acc_priv_len;
-	char             acc_priv[3600];
+	__le32	acc_status;
+	char	hls[12];
+	char	acc_name[48];
+	__le32	acc_lock;
+	char	reserved[12];
+	__le32	acc_ver;
+	__le32	acc_cfg[6];
+	__le32	acc_priv_len;
+	char	acc_priv[3600];
 };
 
 static unsigned int eid_check_item(struct list_item *item)
@@ -169,6 +171,13 @@ static void eid_show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
 	printf("acc_status\t: 0x%-8.8x\n", eid->acc_status);
 	if (human)
 		eid_show_nvme_id_ns_status(eid->acc_status);
+	printf("acc_lock\t: 0x%-8.8x", eid->acc_lock);
+	if (human && eid->acc_lock)
+		printf("\tAccelerator is locked with lock 0x%x\n", eid->acc_lock);
+	else if (human && !eid->acc_lock)
+		printf("\tAccelerator is NOT locked\n");
+	else
+		printf("\n");
 	printf("acc_version\t: 0x%-8.8x\n", eid->acc_ver);
 	for (i = 0; i < 24/4; ++i)
 		printf("acc_cfg[%d]\t: 0x%-8.8x\n", i, eid->acc_cfg[i]);
