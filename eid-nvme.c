@@ -99,23 +99,23 @@ static void eid_show_nvme_id_ns_status(__le32 status)
 	if (upper_rsvd)
 		printf("\t[31:23]\t: 0x%x\tReserved\n", upper_rsvd);
 
-  printf("\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
+	printf("\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
 
-  printf("\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
-  if (as_bwe)
-    printf("enabled ");
-  else
-    printf("NOT enabled ");
-  printf("(AS.BWE)\n");
+	printf("\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
+	if (as_bwe)
+		printf("enabled ");
+	else
+		printf("NOT enabled ");
+	printf("(AS.BWE)\n");
 
-  printf("\t[17:17]\t: %d\tBlocking read functionality is ", as_bre);
-  if (as_bre)
-    printf("enabled ");
-  else
-    printf("NOT enabled ");
-  printf("(AS.BRE)\n");
+	printf("\t[17:17]\t: %d\tBlocking read functionality is ", as_bre);
+	if (as_bre)
+		printf("enabled ");
+	else
+		printf("NOT enabled ");
+	printf("(AS.BRE)\n");
 
-  printf("\t[16:16]\t: %d\tStatus code field is ", as_sen);
+	printf("\t[16:16]\t: %d\tStatus code field is ", as_sen);
 	if (as_sen)
 		printf("enabled ");
 	else
@@ -123,32 +123,32 @@ static void eid_show_nvme_id_ns_status(__le32 status)
 	printf("(AS.SEN)\n");
 
 	if (as_sen) {
-    if (as_sc)
-		  printf("\t[15:8]\t: %d\tStatus code 0x%x occurred "
-          "(AS.SC)\n", as_sc, as_sc);
-	  else
-		  printf("\t[15:8]\t: %d\tNo status code has been "
-          "reported (AS.SC)\n", as_sc);
-  }
+		if (as_sc)
+			printf("\t[15:8]\t: %d\tStatus code 0x%x occurred "
+				"(AS.SC)\n", as_sc, as_sc);
+		else
+			printf("\t[15:8]\t: %d\tNo status code has been "
+			"reported (AS.SC)\n", as_sc);
+	}
 
 	if (lower_rsvd)
 		printf("\t[7:3]\t: 0x%x\tReserved\n", lower_rsvd);
 
 	if (as_wrrdy) {
 		printf("\t[2:2]\t: %d\tAccelerator is ready for "
-		       "the next write command ", as_wrrdy);
+			"the next write command ", as_wrrdy);
 	} else {
 		printf("\t[2:2]\t: %d\tAccelerator is NOT ready for "
-		       "the next write command ", as_wrrdy);
+			"the next write command ", as_wrrdy);
 	}
 	printf("(AS.WRRDY)\n");
 
 	if (as_rdrdy)
 		printf("\t[1:1]\t: %d\tAccelerator is ready for "
-		       "the next read command ", as_rdrdy);
+			"the next read command ", as_rdrdy);
 	else
 		printf("\t[1:1]\t: %d\tAccelerator is NOT ready for "
-		       "the next read command ", as_rdrdy);
+			"the next read command ", as_rdrdy);
 	printf("(AS.RDRDY)\n");
 
 	if (as_en)
