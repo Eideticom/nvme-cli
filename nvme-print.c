@@ -62,7 +62,7 @@ void d(unsigned char *buf, int len, int width, int group)
 	}
 	if (!line_done) {
 		unsigned b = width - (i % width);
-		ascii[i % width + 1] = '\0';
+		ascii[i % width] = '\0';
 		printf( " %*s \"%.*s\"",
 				2 * b + b / group + (b % group ? 1 : 0), "",
 				width, ascii);
