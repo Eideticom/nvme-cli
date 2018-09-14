@@ -41,7 +41,7 @@
 
 static const char *dev = "/dev/";
 
-struct eid_noload {
+struct eid_idns_noload {
 	__le32	acc_status;
 	char	hls[12];
 	char	acc_name[48];
@@ -51,6 +51,11 @@ struct eid_noload {
 	__le32	acc_cfg[6];
 	__le32	acc_priv_len;
 	char	acc_priv[3600];
+};
+
+struct eid_idctrl_noload {
+	__le32	hw_build_date;
+	__le32  fw_build_date;
 };
 
 static unsigned int eid_check_item(struct list_item *item)
@@ -63,23 +68,51 @@ static unsigned int eid_check_item(struct list_item *item)
 
 static void eid_print_list_item(struct list_item list_item)
 {
-	struct eid_noload *eid =
-		(struct eid_noload *) &list_item.ns.vs;
+	struct eid_idns_noload *eid_idns =
+		(struct eid_idns_noload *) &list_item.ns.vs;
+	
+	struct eid_idctrl_noload *eid_idctrl = 
+		(struct eid_idctrl_noload *) &list_item.ctrl.vs;
 
-	printf("%-16s %-64.64s 0x%-8.8x 0x%-8.8x\n", list_item.node,
-	       eid->acc_name, (unsigned int) eid->acc_ver,
-	       (unsigned int) eid->acc_status);
+	char hw_build_str[21];
+	char fw_build_str[21];
+
+	// Pull out the data
+	unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
+	unsigned int hw_month  =  ((eid_idctrl->hw_build_date >> 23) & 0x0Fu);
+	unsigned int hw_year   =  ((eid_idctrl->hw_build_date >> 17) & 0x3Fu);
+	unsigned int hw_hour   =  ((eid_idctrl->hw_build_date >> 12) & 0x1Fu);
+	unsigned int hw_minute =  ((eid_idctrl->hw_build_date >> 6) & 0x3Fu);
+	unsigned int hw_second =  ((eid_idctrl->hw_build_date >> 0) & 0x3Fu);
+
+	unsigned int fw_day    =  ((eid_idctrl->fw_build_date >> 27) & 0x1Fu);
+	unsigned int fw_month  =  ((eid_idctrl->fw_build_date >> 23) & 0x0Fu);
+	unsigned int fw_year   =  ((eid_idctrl->fw_build_date >> 17) & 0x3Fu);
+	unsigned int fw_hour   =  ((eid_idctrl->fw_build_date >> 12) & 0x1Fu);
+	unsigned int fw_minute =  ((eid_idctrl->fw_build_date >> 6) & 0x3Fu);
+	unsigned int fw_second =  ((eid_idctrl->fw_build_date >> 0) & 0x3Fu);
+
+	sprintf(hw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", hw_year+2000, hw_month,
+		hw_day, hw_hour, hw_minute, hw_second);
+
+	sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
+		fw_day, fw_hour, fw_minute, fw_second);
+
+	printf("%-16s %-64.64s %-19.19s %-19.19s 0x%-8.8x 0x%-8.8x\n", list_item.node,
+	       eid_idns->acc_name, hw_build_str, fw_build_str, (unsigned int) eid_idns->acc_ver,
+	       (unsigned int) eid_idns->acc_status);
 }
 
 static void eid_print_list_items(struct list_item *list_items, unsigned int len)
 {
 	unsigned int i;
 
-	printf("%-16s %-64s %-10s %-10s\n",
-	       "Node", "Accelerator Name", "Version", "Status");
-	printf("%-16s %-64s %-10s %-10s\n",
+	printf("%-16s %-64s %-19s %-19s %-10s %-10s\n",
+	       "Node", "Accelerator Name", "HW Build Date", "FW Build Date", "Version", "Status");
+	printf("%-16s %-64s %-19s %-19s %-10s %-10s\n",
 	       "----------------",
 	       "----------------------------------------------------------------",
+	       "-------------------", "-------------------",
 	       "----------", "----------");
 	for (i = 0 ; i < len ; i++)
 		eid_print_list_item(list_items[i]);
@@ -174,8 +207,8 @@ static void eid_show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
 {
 	unsigned int i;
 	int human = mode & HUMAN;
-	struct eid_noload *eid =
-		(struct eid_noload *) &ns->vs;
+	struct eid_idns_noload *eid =
+		(struct eid_idns_noload *) &ns->vs;
 
 	printf("acc_name\t: %s\n", eid->acc_name);
 	printf("acc_status\t: 0x%-8.8x\n", eid->acc_status);
