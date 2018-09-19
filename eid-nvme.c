@@ -80,12 +80,11 @@ static void eid_print_list_items(struct list_item *list_items, unsigned int len)
 {
 	unsigned int i;
 
-	printf("%-16s %-64s %-19s %-19s %-10s %-10s\n",
-	       "Node", "Accelerator Name", "HW Build Date", "FW Build Date", "Version", "Status");
-	printf("%-16s %-64s %-19s %-19s %-10s %-10s\n",
+	printf("%-16s %-64s %-10s %-10s\n",
+	       "Node", "Accelerator Name", "Version", "Status");
+	printf("%-16s %-64s %-10s %-10s\n",
 	       "----------------",
 	       "----------------------------------------------------------------",
-	       "-------------------", "-------------------",
 	       "----------", "----------");
 	for (i = 0 ; i < len ; i++)
 		eid_print_list_item(list_items[i]);
