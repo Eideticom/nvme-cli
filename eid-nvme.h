@@ -10,6 +10,7 @@ PLUGIN(NAME("eid", "Eideticom vendor specific extensions"),
 	COMMAND_LIST(
 		ENTRY("list", "Eideticom NoLoad list accelerator namespaces", eid_list)
 		ENTRY("id-ns", "Eideticom NoLoad print namespace VS info", eid_id_ns)
+		ENTRY("id-ctrl", "Eideticom NoLoad print controller VS info", eid_id_ctrl)
 	)
 );
 
