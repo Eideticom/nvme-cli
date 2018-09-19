@@ -70,36 +70,9 @@ static void eid_print_list_item(struct list_item list_item)
 {
 	struct eid_idns_noload *eid_idns =
 		(struct eid_idns_noload *) &list_item.ns.vs;
-	
-	struct eid_idctrl_noload *eid_idctrl = 
-		(struct eid_idctrl_noload *) &list_item.ctrl.vs;
 
-	char hw_build_str[21];
-	char fw_build_str[21];
-
-	// Pull out the data
-	unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
-	unsigned int hw_month  =  ((eid_idctrl->hw_build_date >> 23) & 0x0Fu);
-	unsigned int hw_year   =  ((eid_idctrl->hw_build_date >> 17) & 0x3Fu);
-	unsigned int hw_hour   =  ((eid_idctrl->hw_build_date >> 12) & 0x1Fu);
-	unsigned int hw_minute =  ((eid_idctrl->hw_build_date >> 6) & 0x3Fu);
-	unsigned int hw_second =  ((eid_idctrl->hw_build_date >> 0) & 0x3Fu);
-
-	unsigned int fw_day    =  ((eid_idctrl->fw_build_date >> 27) & 0x1Fu);
-	unsigned int fw_month  =  ((eid_idctrl->fw_build_date >> 23) & 0x0Fu);
-	unsigned int fw_year   =  ((eid_idctrl->fw_build_date >> 17) & 0x3Fu);
-	unsigned int fw_hour   =  ((eid_idctrl->fw_build_date >> 12) & 0x1Fu);
-	unsigned int fw_minute =  ((eid_idctrl->fw_build_date >> 6) & 0x3Fu);
-	unsigned int fw_second =  ((eid_idctrl->fw_build_date >> 0) & 0x3Fu);
-
-	sprintf(hw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", hw_year+2000, hw_month,
-		hw_day, hw_hour, hw_minute, hw_second);
-
-	sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
-		fw_day, fw_hour, fw_minute, fw_second);
-
-	printf("%-16s %-64.64s %-19.19s %-19.19s 0x%-8.8x 0x%-8.8x\n", list_item.node,
-	       eid_idns->acc_name, hw_build_str, fw_build_str, (unsigned int) eid_idns->acc_ver,
+	printf("%-16s %-64.64s 0x%-8.8x 0x%-8.8x\n", list_item.node,
+	       eid_idns->acc_name, (unsigned int) eid_idns->acc_ver,
 	       (unsigned int) eid_idns->acc_status);
 }
 
@@ -107,12 +80,11 @@ static void eid_print_list_items(struct list_item *list_items, unsigned int len)
 {
 	unsigned int i;
 
-	printf("%-16s %-64s %-19s %-19s %-10s %-10s\n",
-	       "Node", "Accelerator Name", "HW Build Date", "FW Build Date", "Version", "Status");
-	printf("%-16s %-64s %-19s %-19s %-10s %-10s\n",
+	printf("%-16s %-64s %-10s %-10s\n",
+	       "Node", "Accelerator Name", "Version", "Status");
+	printf("%-16s %-64s %-10s %-10s\n",
 	       "----------------",
 	       "----------------------------------------------------------------",
-	       "-------------------", "-------------------",
 	       "----------", "----------");
 	for (i = 0 ; i < len ; i++)
 		eid_print_list_item(list_items[i]);
@@ -231,6 +203,45 @@ static void eid_show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
 	}
 }
 
+static void eid_show_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode)
+{
+	int human = mode & HUMAN;
+	struct eid_idctrl_noload *eid_idctrl = 
+		(struct eid_idctrl_noload *) &ctrl->vs;
+
+	if (!human) {
+		printf("hw_build_date\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
+		printf("fw_build_date\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
+	} else {
+		char hw_build_str[21];
+		char fw_build_str[21];
+
+		// Pull out the data
+		unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
+		unsigned int hw_month  =  ((eid_idctrl->hw_build_date >> 23) & 0x0Fu);
+		unsigned int hw_year   =  ((eid_idctrl->hw_build_date >> 17) & 0x3Fu);
+		unsigned int hw_hour   =  ((eid_idctrl->hw_build_date >> 12) & 0x1Fu);
+		unsigned int hw_minute =  ((eid_idctrl->hw_build_date >> 6) & 0x3Fu);
+		unsigned int hw_second =  ((eid_idctrl->hw_build_date >> 0) & 0x3Fu);
+
+		unsigned int fw_day    =  ((eid_idctrl->fw_build_date >> 27) & 0x1Fu);
+		unsigned int fw_month  =  ((eid_idctrl->fw_build_date >> 23) & 0x0Fu);
+		unsigned int fw_year   =  ((eid_idctrl->fw_build_date >> 17) & 0x3Fu);
+		unsigned int fw_hour   =  ((eid_idctrl->fw_build_date >> 12) & 0x1Fu);
+		unsigned int fw_minute =  ((eid_idctrl->fw_build_date >> 6) & 0x3Fu);
+		unsigned int fw_second =  ((eid_idctrl->fw_build_date >> 0) & 0x3Fu);
+
+		sprintf(hw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", hw_year+2000, hw_month,
+			hw_day, hw_hour, hw_minute, hw_second);
+
+		sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
+			fw_day, fw_hour, fw_minute, fw_second);
+		
+		printf("hw_build_date\t: %s\n", hw_build_str);
+		printf("fw_build_date\t: %s\n", fw_build_str);
+	}
+}
+
 /*
  * List all the Eideticom namespaces in the system and identify the
  * accerlation functio provided by that namespace. We base this off
@@ -304,14 +315,66 @@ static int eid_list(int argc, char **argv, struct command *command,
 	return 0;
 }
 
+static int eid_id_ctrl(int argc, char **argv, struct command *command, 
+				 struct plugin *plugin)
+{
+	const char *desc = "Send an Identify Controller command to the "\
+		"given device, returns vendor specific properties of the " \
+		"specified namespace. Fails on non-Eideticom namespaces.";
+	const char *human_readable = "show infos in readable format";
+	struct nvme_id_ctrl ctrl;
+	struct stat nvme_stat;
+	unsigned int flags = 0;
+
+	int err, fd;
+
+	struct config {
+		int human_readable;
+	};
+
+	struct config cfg;
+
+	const struct argconfig_commandline_options command_line_options[] = {
+		{"human-readable", 'H', "", CFG_NONE, &cfg.human_readable,
+		 no_argument, human_readable},
+		{NULL}
+	};
+
+	fd = parse_and_open(argc, argv, desc, command_line_options,
+			    &cfg, sizeof(cfg));
+	if (fd < 0)
+		return fd;
+
+	err = fstat(fd, &nvme_stat);
+	if (err < 0)
+		return err;
+
+	if (cfg.human_readable)
+		flags |= HUMAN;
+
+	err = nvme_identify_ctrl(fd, &ctrl);
+	if (!err) {
+		printf("Eideticom NVME Identify Controller:\n");
+		eid_show_nvme_id_ctrl(&ctrl, flags);
+	} else if (err > 0) {
+		fprintf(stderr, "NVMe Status:%s(%x)\n",
+			nvme_status_to_string(err), err);
+	} else {
+		perror("identify controller");
+	}
+
+	return 0;
+	
+}
+
 static int eid_id_ns(int argc, char **argv, struct command *command,
 				 struct plugin *plugin)
 {
 	const char *desc = "Send an Identify Namespace command to the "\
-		"given device, returns properties of the specified namespace. "	\
-		"Fails on non-Eideticom namespaces.";
-	const char *namespace_id = "identifier of desired namespace";
+		"given device, returns vendor specific properties of the " \
+		"specified namespace. Fails on non-Eideticom namespaces.";
 	const char *human_readable = "show infos in readable format";
+	const char *namespace_id = "identifier of desired controller";
 	struct nvme_id_ns ns;
 	struct stat nvme_stat;
 	unsigned int flags = 0;
