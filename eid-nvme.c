@@ -90,7 +90,7 @@ static void eid_print_list_items(struct list_item *list_items, unsigned int len)
 		eid_print_list_item(list_items[i]);
 }
 
-static void eid_show_nvme_id_ns_status(__le32 status)
+static void eid_show_id_ns_vs_status(__le32 status)
 {
 	int as_en = status & 0x1;
 	int as_rdrdy = (status & 0x2) >> 1;
@@ -175,17 +175,41 @@ static void eid_show_nvme_id_ns_status(__le32 status)
 	printf("(AS.EN)\n\n");
 }
 
-static void eid_show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
+static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
 {
 	unsigned int i;
-	int human = mode & HUMAN;
-	struct eid_idns_noload *eid =
-		(struct eid_idns_noload *) &ns->vs;
+	struct json_object *root;
+	struct json_array *acc_cfg;
 
+	root = json_create_object();
+
+	json_object_add_value_string(root, "acc_name", eid->acc_name);
+	json_object_add_value_uint(root, "acc_status", eid->acc_status);
+	json_object_add_value_uint(root, "acc_lock", eid->acc_lock);
+	json_object_add_value_uint(root, "acc_version", eid->acc_ver);
+
+	acc_cfg = json_create_array();
+
+	for (i = 0; i < 24/4; ++i)
+		json_array_add_value_uint(acc_cfg, eid->acc_cfg[i]);
+
+	json_object_add_value_array(root, "acc_cfg", acc_cfg);
+	json_object_add_value_uint(root, "acc_spec_bytes", eid->acc_priv_len);
+
+	// TBD: Add something here for acc_user_space?
+
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
+static void eid_show_id_ns_vs(struct eid_idns_noload *eid, int human)
+{
+	unsigned int i;
 	printf("acc_name\t: %s\n", eid->acc_name);
 	printf("acc_status\t: 0x%-8.8x\n", eid->acc_status);
 	if (human)
-		eid_show_nvme_id_ns_status(eid->acc_status);
+		eid_show_id_ns_vs_status(eid->acc_status);
 	printf("acc_lock\t: 0x%-8.8x", eid->acc_lock);
 	if (human && eid->acc_lock)
 		printf("\tAccelerator is locked with lock 0x%x\n", eid->acc_lock);
@@ -203,49 +227,91 @@ static void eid_show_nvme_id_ns(struct nvme_id_ns *ns, unsigned int mode)
 	}
 }
 
-static void eid_show_nvme_id_ctrl(struct nvme_id_ctrl *ctrl, unsigned int mode)
+static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int mode, int fmt)
 {
 	int human = mode & HUMAN;
-	struct eid_idctrl_noload *eid_idctrl = 
-		(struct eid_idctrl_noload *) &ctrl->vs;
 
+	if (fmt == JSON)
+		json_eid_show_id_ns_vs(eid);
+	else {
+		printf("NVME Identify Namespace %d:\n", nsid);
+		eid_show_id_ns_vs(eid, human);
+	}
+}
+
+static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, char *fw_build_str, int human)
+{
+	struct json_object *root;
+
+	root = json_create_object();
+
+	if (human) {
+		json_object_add_value_string(root, "hw_build_date", hw_build_str);
+		json_object_add_value_string(root, "fw_build_date", fw_build_str);
+	}
+	else {
+		json_object_add_value_uint(root, "hw_build_date", le32_to_cpu(eid_idctrl->hw_build_date));
+		json_object_add_value_uint(root, "fw_build_date", le32_to_cpu(eid_idctrl->fw_build_date));
+	}
+
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
+static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, char *fw_build_str, int human)
+{
 	if (!human) {
 		printf("hw_build_date\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
 		printf("fw_build_date\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
 	} else {
-		char hw_build_str[21];
-		char fw_build_str[21];
-
-		// Pull out the data
-		unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
-		unsigned int hw_month  =  ((eid_idctrl->hw_build_date >> 23) & 0x0Fu);
-		unsigned int hw_year   =  ((eid_idctrl->hw_build_date >> 17) & 0x3Fu);
-		unsigned int hw_hour   =  ((eid_idctrl->hw_build_date >> 12) & 0x1Fu);
-		unsigned int hw_minute =  ((eid_idctrl->hw_build_date >> 6) & 0x3Fu);
-		unsigned int hw_second =  ((eid_idctrl->hw_build_date >> 0) & 0x3Fu);
-
-		unsigned int fw_day    =  ((eid_idctrl->fw_build_date >> 27) & 0x1Fu);
-		unsigned int fw_month  =  ((eid_idctrl->fw_build_date >> 23) & 0x0Fu);
-		unsigned int fw_year   =  ((eid_idctrl->fw_build_date >> 17) & 0x3Fu);
-		unsigned int fw_hour   =  ((eid_idctrl->fw_build_date >> 12) & 0x1Fu);
-		unsigned int fw_minute =  ((eid_idctrl->fw_build_date >> 6) & 0x3Fu);
-		unsigned int fw_second =  ((eid_idctrl->fw_build_date >> 0) & 0x3Fu);
-
-		sprintf(hw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", hw_year+2000, hw_month,
-			hw_day, hw_hour, hw_minute, hw_second);
-
-		sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
-			fw_day, fw_hour, fw_minute, fw_second);
-		
 		printf("hw_build_date\t: %s\n", hw_build_str);
 		printf("fw_build_date\t: %s\n", fw_build_str);
 	}
 }
 
+static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned int mode, int fmt)
+{
+	int human = mode & HUMAN;
+	char hw_build_str[21];
+	char fw_build_str[21];
+
+	// Pull out the data
+	unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
+	unsigned int hw_month  =  ((eid_idctrl->hw_build_date >> 23) & 0x0Fu);
+	unsigned int hw_year   =  ((eid_idctrl->hw_build_date >> 17) & 0x3Fu);
+	unsigned int hw_hour   =  ((eid_idctrl->hw_build_date >> 12) & 0x1Fu);
+	unsigned int hw_minute =  ((eid_idctrl->hw_build_date >> 6) & 0x3Fu);
+	unsigned int hw_second =  ((eid_idctrl->hw_build_date >> 0) & 0x3Fu);
+
+	unsigned int fw_day    =  ((eid_idctrl->fw_build_date >> 27) & 0x1Fu);
+	unsigned int fw_month  =  ((eid_idctrl->fw_build_date >> 23) & 0x0Fu);
+	unsigned int fw_year   =  ((eid_idctrl->fw_build_date >> 17) & 0x3Fu);
+	unsigned int fw_hour   =  ((eid_idctrl->fw_build_date >> 12) & 0x1Fu);
+	unsigned int fw_minute =  ((eid_idctrl->fw_build_date >> 6) & 0x3Fu);
+	unsigned int fw_second =  ((eid_idctrl->fw_build_date >> 0) & 0x3Fu);
+
+	sprintf(hw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", hw_year+2000, hw_month,
+		hw_day, hw_hour, hw_minute, hw_second);
+
+	sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
+		fw_day, fw_hour, fw_minute, fw_second);
+
+	if (fmt == JSON)
+		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, human);
+	else {
+		printf("Eideticom NVME Identify Controller:\n");
+		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, human);
+	}
+}
+
 /*
  * List all the Eideticom namespaces in the system and identify the
- * accerlation functio provided by that namespace. We base this off
+ * accerlation function provided by that namespace. We base this off
  * the Huawei code. Ideally we'd refactor this a bit. That is a TBD.
+ * TBD: The code in scan_device_filter has been made static in 
+ * nvme.c linux-nvme. We'll need to either make our own copy before
+ * pull requesting upstream.
  */
 
 static int eid_list(int argc, char **argv, struct command *command,
@@ -322,21 +388,27 @@ static int eid_id_ctrl(int argc, char **argv, struct command *command,
 		"given device, returns vendor specific properties of the " \
 		"specified namespace. Fails on non-Eideticom namespaces.";
 	const char *human_readable = "show infos in readable format";
+	const char *output_format = "Output format: normal|json";
 	struct nvme_id_ctrl ctrl;
 	struct stat nvme_stat;
 	unsigned int flags = 0;
 
-	int err, fd;
+	int err, fmt, fd;
 
 	struct config {
 		int human_readable;
+		char *output_format;
 	};
 
-	struct config cfg;
+	struct config cfg = {
+		.output_format = "normal",
+	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
 		{"human-readable", 'H', "", CFG_NONE, &cfg.human_readable,
 		 no_argument, human_readable},
+		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format,
+		 required_argument, output_format},
 		{NULL}
 	};
 
@@ -344,6 +416,12 @@ static int eid_id_ctrl(int argc, char **argv, struct command *command,
 			    &cfg, sizeof(cfg));
 	if (fd < 0)
 		return fd;
+
+	fmt = validate_output_format(cfg.output_format);
+	if (fmt < 0) {
+		err = fmt;
+		goto close_fd;
+	}
 
 	err = fstat(fd, &nvme_stat);
 	if (err < 0)
@@ -354,8 +432,7 @@ static int eid_id_ctrl(int argc, char **argv, struct command *command,
 
 	err = nvme_identify_ctrl(fd, &ctrl);
 	if (!err) {
-		printf("Eideticom NVME Identify Controller:\n");
-		eid_show_nvme_id_ctrl(&ctrl, flags);
+		eid_nvme_id_ctrl_vs((struct eid_idctrl_noload *) &ctrl.vs, flags, fmt);
 	} else if (err > 0) {
 		fprintf(stderr, "NVMe Status:%s(%x)\n",
 			nvme_status_to_string(err), err);
@@ -363,7 +440,10 @@ static int eid_id_ctrl(int argc, char **argv, struct command *command,
 		perror("identify controller");
 	}
 
-	return 0;
+close_fd:
+	close(fd);
+
+	return err;
 	
 }
 
@@ -375,19 +455,22 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 		"specified namespace. Fails on non-Eideticom namespaces.";
 	const char *human_readable = "show infos in readable format";
 	const char *namespace_id = "identifier of desired controller";
+	const char *output_format = "Output format: normal|json";
 	struct nvme_id_ns ns;
 	struct stat nvme_stat;
 	unsigned int flags = 0;
 
-	int err, fd;
+	int err, fmt, fd;
 
 	struct config {
 		__u32 namespace_id;
 		int human_readable;
+		char *output_format;
 	};
 
 	struct config cfg = {
 		.namespace_id    = 0,
+		.output_format   = "normal",
 	};
 
 	const struct argconfig_commandline_options command_line_options[] = {
@@ -395,6 +478,8 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 		 required_argument, namespace_id},
 		{"human-readable", 'H', "", CFG_NONE, &cfg.human_readable,
 		 no_argument, human_readable},
+		{"output-format", 'o', "FMT", CFG_STRING, &cfg.output_format,
+		 required_argument, output_format},
 		{NULL}
 	};
 
@@ -402,6 +487,12 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 			    &cfg, sizeof(cfg));
 	if (fd < 0)
 		return fd;
+
+	fmt = validate_output_format(cfg.output_format);
+	if (fmt < 0) {
+		err = fmt;
+		goto close_fd;
+	}
 
 	err = fstat(fd, &nvme_stat);
 	if (err < 0)
@@ -418,13 +509,16 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 
 	err = nvme_identify_ns(fd, cfg.namespace_id, 0, &ns);
 	if (!err) {
-		printf("NVME Identify Namespace %d:\n", cfg.namespace_id);
-		eid_show_nvme_id_ns(&ns, flags);
+		eid_id_ns_vs((struct eid_idns_noload *) &ns.vs, cfg.namespace_id, flags, fmt);
 	} else if (err > 0) {
 		fprintf(stderr, "NVMe Status:%s(%x) NSID:%d\n",
 			nvme_status_to_string(err), err, cfg.namespace_id);
 	} else {
 		perror("identify namespace");
 	}
+
+close_fd:
+	close(fd);
+
 	return err;
 }
