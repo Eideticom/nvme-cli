@@ -266,6 +266,9 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
  * List all the Eideticom namespaces in the system and identify the
  * accerlation functio provided by that namespace. We base this off
  * the Huawei code. Ideally we'd refactor this a bit. That is a TBD.
+ * TBD: The code in scan_device_filter has been made static in 
+ * nvme.c linux-nvme. We'll need to either make our own copy before
+ * pull requesting upstream.
  */
 
 static int eid_list(int argc, char **argv, struct command *command,
