@@ -171,7 +171,6 @@ static void show_intel_smart_log_jsn(struct nvme_additional_smart_log *smart,
 	json_object_add_value_object(root, "Device stats", dev_stats);
 
 	json_print_object(root, NULL);
-	printf("\n");
 	json_free_object(root);
 }
 
@@ -255,7 +254,8 @@ static int get_additional_smart_log(int argc, char **argv, struct command *cmd, 
 	if (fd < 0)
 		return fd;
 
-	err = nvme_get_log(fd, cfg.namespace_id, 0xca, sizeof(smart_log), &smart_log);
+	err = nvme_get_log(fd, cfg.namespace_id, 0xca, false,
+			   sizeof(smart_log), &smart_log);
 	if (!err) {
 		if (cfg.json)
 			show_intel_smart_log_jsn(&smart_log, cfg.namespace_id, devicename);
@@ -293,7 +293,8 @@ static int get_market_log(int argc, char **argv, struct command *cmd, struct plu
 	if (fd < 0)
 		return fd;
 
-	err = nvme_get_log(fd, NVME_NSID_ALL, 0xdd, sizeof(log), log);
+	err = nvme_get_log(fd, NVME_NSID_ALL, 0xdd, false,
+			   sizeof(log), log);
 	if (!err) {
 		if (!cfg.raw_binary)
 			printf("Intel Marketing Name Log:\n%s\n", log);
@@ -355,7 +356,8 @@ static int get_temp_stats_log(int argc, char **argv, struct command *cmd, struct
 	if (fd < 0)
 		return fd;
 
-	err = nvme_get_log(fd, NVME_NSID_ALL, 0xc5, sizeof(stats), &stats);
+	err = nvme_get_log(fd, NVME_NSID_ALL, 0xc5, false,
+			   sizeof(stats), &stats);
 	if (!err) {
 		if (!cfg.raw_binary)
 			show_temp_stats(&stats);
@@ -390,11 +392,11 @@ static void show_lat_stats(struct intel_lat_stats *stats, int write)
 
 	printf("\nGroup 2: Range is 1-32ms, step is 1ms\n");
 	for (i = 0; i < 31; i++)
-		printf("Bucket %2d: %u\n", i, stats->bucket_1[i]);
+		printf("Bucket %2d: %u\n", i, stats->bucket_2[i]);
 
 	printf("\nGroup 3: Range is 32-1s, step is 32ms:\n");
 	for (i = 0; i < 31; i++)
-		printf("Bucket %2d: %u\n", i, stats->bucket_1[i]);
+		printf("Bucket %2d: %u\n", i, stats->bucket_3[i]);
 }
 
 static int get_lat_stats_log(int argc, char **argv, struct command *cmd, struct plugin *plugin)
@@ -423,7 +425,8 @@ static int get_lat_stats_log(int argc, char **argv, struct command *cmd, struct 
 	if (fd < 0)
 		return fd;
 
-	err = nvme_get_log(fd, NVME_NSID_ALL, cfg.write ? 0xc2 : 0xc1, sizeof(stats), &stats);
+	err = nvme_get_log(fd, NVME_NSID_ALL, cfg.write ? 0xc2 : 0xc1,
+			   false, sizeof(stats), &stats);
 	if (!err) {
 		if (!cfg.raw_binary)
 			show_lat_stats(&stats, cfg.write);

@@ -76,6 +76,12 @@ struct nvme_auto_pst {
 	__u32	rsvd32;
 };
 
+struct nvme_timestamp {
+	__u8 timestamp[6];
+	__u8 attr;
+	__u8 rsvd;
+};
+
 struct nvme_controller_list {
 	__le16 num;
 	__le16 identifier[];
@@ -149,4 +155,6 @@ extern const char *devicename;
 int __id_ctrl(int argc, char **argv, struct command *cmd, struct plugin *plugin, void (*vs)(__u8 *vs, struct json_object *root));
 int	validate_output_format(char *format);
 
+struct subsys_list_item *get_subsys_list(int *subcnt);
+void free_subsys_list(struct subsys_list_item *slist, int n);
 #endif /* _NVME_H */

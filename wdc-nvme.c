@@ -238,7 +238,7 @@ typedef struct _WDC_DE_CSA_FEATURE_ID_LIST
     __u8 featureName[WDC_DE_GENERIC_BUFFER_SIZE];
 } WDC_DE_CSA_FEATURE_ID_LIST;
 
-WDC_DE_CSA_FEATURE_ID_LIST deFeatureIdList[] =
+static WDC_DE_CSA_FEATURE_ID_LIST deFeatureIdList[] =
 {
 	{0x00                                   , "Dummy Placeholder"},
 	{FID_ARBITRATION                        , "Arbitration"},
@@ -274,7 +274,7 @@ typedef struct _WDC_NVME_DE_VU_LOGPAGES
     __u32 numOfVULogPages;
 } WDC_NVME_DE_VU_LOGPAGES, *PWDC_NVME_DE_VU_LOGPAGES;
 
-NVME_VU_DE_LOGPAGE_LIST deVULogPagesList[] =
+static NVME_VU_DE_LOGPAGE_LIST deVULogPagesList[] =
 {
     { NVME_DE_LOGPAGE_E3, 0xE3, 1072, "0xe3"},
     { NVME_DE_LOGPAGE_C0, 0xC0, 512, "0xc0"}
@@ -508,11 +508,13 @@ static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
 {
 	int i;
 	int ret;
+	int res_len = 0;
 	char orig[PATH_MAX] = {0};
 	struct nvme_id_ctrl ctrl;
+	int ctrl_sn_len = sizeof (ctrl.sn);
 
 	i = sizeof (ctrl.sn) - 1;
-	strncpy(orig, file, PATH_MAX);
+	strncpy(orig, file, PATH_MAX - 1);
 	memset(file, 0, len);
 	memset(&ctrl, 0, sizeof (struct nvme_id_ctrl));
 	ret = nvme_identify_ctrl(fd, &ctrl);
@@ -526,7 +528,18 @@ static int wdc_get_serial_name(int fd, char *file, size_t len, char *suffix)
 		ctrl.sn[i] = '\0';
 		i--;
 	}
-	snprintf(file, len, "%s%s%s.bin", orig, ctrl.sn, suffix);
+
+	if (ctrl.sn[sizeof (ctrl.sn) - 1] == '\0') {
+		ctrl_sn_len = strlen(ctrl.sn);
+	}
+
+	res_len = snprintf(file, len, "%s%.*s%s.bin", orig, ctrl_sn_len, ctrl.sn, suffix);
+	if (len <= res_len) {
+		fprintf(stderr, "ERROR : WDC : cannot format serial number due to data "
+				"of unexpected length\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -590,7 +603,7 @@ static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
 
 	/* get the log page length */
 	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE,
-			   WDC_C2_LOG_BUF_LEN, data);
+			   false, WDC_C2_LOG_BUF_LEN, data);
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : Unable to get C2 Log Page length, ret = %d\n", ret);
 		goto out;
@@ -604,7 +617,7 @@ static int wdc_nvme_check_supported_log_page(int fd, __u8 log_id)
 	}
 
 	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_AVAILABLE_LOG_PAGES_OPCODE,
-			   hdr_ptr->length, data);
+			   false,  hdr_ptr->length, data);
 	/* parse the data until the List of log page ID's is found */
 	if (ret) {
 		fprintf(stderr, "ERROR : WDC : Unable to read C2 Log Page data, ret = %d\n", ret);
@@ -770,7 +783,7 @@ static int wdc_cap_diag(int argc, char **argv, struct command *command,
 
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
-		strncpy(f, cfg.file, PATH_MAX);
+		strncpy(f, cfg.file, PATH_MAX - 1);
 	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "cap_diag") == -1) {
 		fprintf(stderr, "ERROR : WDC: failed to generate file name\n");
@@ -813,7 +826,7 @@ static int wdc_crash_dump(int fd, char *file)
 	char f[PATH_MAX] = {0};
 
 	if (file != NULL) {
-		strncpy(f, file, PATH_MAX);
+		strncpy(f, file, PATH_MAX - 1);
 	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "crash_dump") == -1) {
 		fprintf(stderr, "ERROR : WDC : failed to generate file name\n");
@@ -890,7 +903,7 @@ static int wdc_drive_log(int argc, char **argv, struct command *command,
 
 	wdc_check_device(fd);
 	if (cfg.file != NULL) {
-		strncpy(f, cfg.file, PATH_MAX);
+		strncpy(f, cfg.file, PATH_MAX - 1);
 	}
 	if (wdc_get_serial_name(fd, f, PATH_MAX, "drive_log") == -1) {
 		fprintf(stderr, "ERROR : WDC : failed to generate file name\n");
@@ -1358,7 +1371,7 @@ static int wdc_get_ca_log_page(int fd, char *format)
 	memset(data, 0, sizeof (__u8) * WDC_CA_LOG_BUF_LEN);
 
 	ret = nvme_get_log(fd, 0xFFFFFFFF, WDC_NVME_GET_DEVICE_INFO_LOG_OPCODE,
-			   WDC_CA_LOG_BUF_LEN, data);
+			   false, WDC_CA_LOG_BUF_LEN, data);
 	if (strcmp(format, "json"))
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 
@@ -1407,7 +1420,7 @@ static int wdc_get_c1_log_page(int fd, char *format, uint8_t interval)
 	memset(data, 0, sizeof (__u8) * WDC_ADD_LOG_BUF_LEN);
 
 	ret = nvme_get_log(fd, 0x01, WDC_NVME_ADD_LOG_OPCODE,
-			   WDC_ADD_LOG_BUF_LEN, data);
+			   false, WDC_ADD_LOG_BUF_LEN, data);
 	if (strcmp(format, "json"))
 		fprintf(stderr, "NVMe Status:%s(%x)\n", nvme_status_to_string(ret), ret);
 	if (ret == 0) {
@@ -1567,7 +1580,7 @@ static int wdc_get_max_transfer_len(int fd, __u32 *maxTransferLen)
 	return ret;
 }
 
-int wdc_de_VU_read_size(int fd, __u32 fileId, __u16 spiDestn, __u32* logSize)
+static int wdc_de_VU_read_size(int fd, __u32 fileId, __u16 spiDestn, __u32* logSize)
 {
 	int ret = WDC_STATUS_FAILURE;
 	struct nvme_admin_cmd cmd;
@@ -1595,7 +1608,7 @@ int wdc_de_VU_read_size(int fd, __u32 fileId, __u16 spiDestn, __u32* logSize)
 	return ret;
 }
 
-int wdc_de_VU_read_buffer(int fd, __u32 fileId, __u16 spiDestn, __u32 offsetInDwords, __u8* dataBuffer, __u32* bufferSize)
+static int wdc_de_VU_read_buffer(int fd, __u32 fileId, __u16 spiDestn, __u32 offsetInDwords, __u8* dataBuffer, __u32* bufferSize)
 {
 	int ret = WDC_STATUS_FAILURE;
 	struct nvme_admin_cmd cmd;
@@ -1628,7 +1641,7 @@ int wdc_de_VU_read_buffer(int fd, __u32 fileId, __u16 spiDestn, __u32 offsetInDw
 	return ret;
 }
 
-int wdc_get_log_dir_max_entries(int fd, __u32* maxNumOfEntries)
+static int wdc_get_log_dir_max_entries(int fd, __u32* maxNumOfEntries)
 {
 	int     		ret = WDC_STATUS_FAILURE;
 	__u32           headerPayloadSize = 0;
@@ -1676,7 +1689,7 @@ int wdc_get_log_dir_max_entries(int fd, __u32* maxNumOfEntries)
 	return ret;
 }
 
-WDC_DRIVE_ESSENTIAL_TYPE wdc_get_essential_type(__u8 fileName[])
+static WDC_DRIVE_ESSENTIAL_TYPE wdc_get_essential_type(__u8 fileName[])
 {
 	WDC_DRIVE_ESSENTIAL_TYPE essentialType = WDC_DE_TYPE_NONE;
 
@@ -1696,7 +1709,7 @@ WDC_DRIVE_ESSENTIAL_TYPE wdc_get_essential_type(__u8 fileName[])
 	return essentialType;
 }
 
-int wdc_fetch_log_directory(int fd, PWDC_DE_VU_LOG_DIRECTORY directory)
+static int wdc_fetch_log_directory(int fd, PWDC_DE_VU_LOG_DIRECTORY directory)
 {
 	int             ret = WDC_STATUS_FAILURE;
 	__u8            *fileOffset = NULL;
@@ -1773,7 +1786,7 @@ int wdc_fetch_log_directory(int fd, PWDC_DE_VU_LOG_DIRECTORY directory)
 	return ret;
 }
 
-int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 fileSize, __u8* dataBuffer)
+static int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 fileSize, __u8* dataBuffer)
 {
 	int ret = WDC_STATUS_FAILURE;
 	__u32                     chunckSize = WDC_DE_VU_READ_BUFFER_STANDARD_OFFSET;
@@ -1826,7 +1839,7 @@ int wdc_fetch_log_file_from_device(int fd, __u32 fileId, __u16 spiDestn, __u64 f
 	return ret;
 }
 
-int wdc_de_get_dump_trace(int fd, char * filePath, __u16 binFileNameLen, char *binFileName)
+static int wdc_de_get_dump_trace(int fd, char * filePath, __u16 binFileNameLen, char *binFileName)
 {
 	int                     ret = WDC_STATUS_FAILURE;
 	__u8                    *readBuffer = NULL;
@@ -2094,7 +2107,7 @@ static int wdc_do_drive_essentials(int fd, char *dir, char *key)
 		memset(dataBuffer, 0, dataBufferSize);
 
 		ret = nvme_get_log(fd, WDC_DE_GLOBAL_NSID, deVULogPagesList[vuLogIdx].logPageId,
-				   dataBufferSize, dataBuffer);
+				   false, dataBufferSize, dataBuffer);
 		if (ret) {
 			fprintf(stderr, "ERROR : WDC : nvme_get_log() for log page 0x%x failed, ret = %d\n",
 					deVULogPagesList[vuLogIdx].logPageId, ret);
@@ -2250,7 +2263,7 @@ static int wdc_drive_essentials(int argc, char **argv, struct command *command,
 	}
 
 	if (cfg.dirName != NULL) {
-		strncpy(d, cfg.dirName, PATH_MAX);
+		strncpy(d, cfg.dirName, PATH_MAX - 1);
 		d_ptr = d;
 	} else {
 		d_ptr = NULL;
