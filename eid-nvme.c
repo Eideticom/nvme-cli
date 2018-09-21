@@ -175,11 +175,37 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	printf("(AS.EN)\n\n");
 }
 
-static void eid_show_id_ns_vs(struct eid_idns_noload *eid, unsigned int mode, int fmt)
+static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
 {
 	unsigned int i;
-	int human = mode & HUMAN;
+	struct json_object *root;
+	struct json_array *acc_cfg;
 
+	root = json_create_object();
+
+	json_object_add_value_string(root, "acc_name", eid->acc_name);
+	json_object_add_value_uint(root, "acc_status", eid->acc_status);
+	json_object_add_value_uint(root, "acc_lock", eid->acc_lock);
+	json_object_add_value_uint(root, "acc_version", eid->acc_ver);
+
+	acc_cfg = json_create_array();
+
+	for (i = 0; i < 24/4; ++i)
+		json_array_add_value_uint(acc_cfg, eid->acc_cfg[i]);
+
+	json_object_add_value_array(root, "acc_cfg", acc_cfg);
+	json_object_add_value_uint(root, "acc_spec_bytes", eid->acc_priv_len);
+
+	// TBD: Add something here for acc_user_space?
+
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
+static void eid_show_id_ns_vs(struct eid_idns_noload *eid, int human)
+{
+	unsigned int i;
 	printf("acc_name\t: %s\n", eid->acc_name);
 	printf("acc_status\t: 0x%-8.8x\n", eid->acc_status);
 	if (human)
@@ -201,6 +227,18 @@ static void eid_show_id_ns_vs(struct eid_idns_noload *eid, unsigned int mode, in
 	}
 }
 
+static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int mode, int fmt)
+{
+	int human = mode & HUMAN;
+
+	if (fmt == JSON)
+		json_eid_show_id_ns_vs(eid);
+	else {
+		printf("NVME Identify Namespace %d:\n", nsid);
+		eid_show_id_ns_vs(eid, human);
+	}
+}
+
 static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, char *fw_build_str, int human)
 {
 	struct json_object *root;
@@ -219,6 +257,17 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 	json_print_object(root, NULL);
 	printf("\n");
 	json_free_object(root);
+}
+
+static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, char *fw_build_str, int human)
+{
+	if (!human) {
+		printf("hw_build_date\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
+		printf("fw_build_date\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
+	} else {
+		printf("hw_build_date\t: %s\n", hw_build_str);
+		printf("fw_build_date\t: %s\n", fw_build_str);
+	}
 }
 
 static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned int mode, int fmt)
@@ -252,19 +301,13 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, human);
 	else {
 		printf("Eideticom NVME Identify Controller:\n");
-		if (!human) {
-			printf("hw_build_date\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
-			printf("fw_build_date\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
-		} else {
-			printf("hw_build_date\t: %s\n", hw_build_str);
-			printf("fw_build_date\t: %s\n", fw_build_str);		
-		}
+		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, human);
 	}
 }
 
 /*
  * List all the Eideticom namespaces in the system and identify the
- * accerlation functio provided by that namespace. We base this off
+ * accerlation function provided by that namespace. We base this off
  * the Huawei code. Ideally we'd refactor this a bit. That is a TBD.
  * TBD: The code in scan_device_filter has been made static in 
  * nvme.c linux-nvme. We'll need to either make our own copy before
@@ -466,8 +509,7 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 
 	err = nvme_identify_ns(fd, cfg.namespace_id, 0, &ns);
 	if (!err) {
-		printf("NVME Identify Namespace %d:\n", cfg.namespace_id);
-		eid_show_id_ns_vs((struct eid_idns_noload *) &ns.vs, flags, fmt);
+		eid_id_ns_vs((struct eid_idns_noload *) &ns.vs, cfg.namespace_id, flags, fmt);
 	} else if (err > 0) {
 		fprintf(stderr, "NVMe Status:%s(%x) NSID:%d\n",
 			nvme_status_to_string(err), err, cfg.namespace_id);
