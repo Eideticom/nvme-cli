@@ -148,6 +148,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 	const struct argconfig_commandline_options *s;
 	int c, option_index = 0, short_index = 0, options_count = 0;
 	void *value_addr;
+	int ret = -EINVAL;
 
 	errno = 0;
 	for (s = options; s->option != NULL; s++)
@@ -155,6 +156,13 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 
 	long_opts = malloc(sizeof(struct option) * (options_count + 2));
 	short_opts = malloc(sizeof(*short_opts) * (options_count * 3 + 4));
+
+	if (!long_opts || !short_opts) {
+		fprintf(stderr, "failed to allocate memory for opts: %s\n",
+				strerror(errno));
+		ret = -errno;
+		goto out;
+	}
 
 	for (s = options; (s->option != NULL) && (option_index < options_count);
 	     s++) {
@@ -304,6 +312,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 			char **opts = ((char **)value_addr);
 			int remaining_space = CFG_MAX_SUBOPTS;
 			int enddefault = 0;
+			int r;
 			while (0 && *opts != NULL) {
 				if (*opts == END_DEFAULT)
 					enddefault = 1;
@@ -317,9 +326,8 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 				opts += 2;
 			}
 
-			int r =
-			    argconfig_parse_subopt_string(optarg, opts,
-							  remaining_space);
+			r = argconfig_parse_subopt_string(optarg, opts,
+					remaining_space);
 			if (r == 2) {
 				fprintf(stderr,
 					"Error Parsing Sub-Options: Too many options!\n");
@@ -335,6 +343,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 			   s->config_type == CFG_FILE_RP ||
 			   s->config_type == CFG_FILE_WP) {
 			const char *fopts = "";
+			FILE *f;
 			if (s->config_type == CFG_FILE_A)
 				fopts = "a";
 			else if (s->config_type == CFG_FILE_R)
@@ -348,7 +357,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
 			else if (s->config_type == CFG_FILE_WP)
 				fopts = "w+";
 
-			FILE *f = fopen(optarg, fopts);
+			f = fopen(optarg, fopts);
 			if (f == NULL) {
 				fprintf(stderr, "Unable to open %s file: %s\n",
 					s->option, optarg);
@@ -364,7 +373,7 @@ int argconfig_parse(int argc, char *argv[], const char *program_desc,
  out:
 	free(short_opts);
 	free(long_opts);
-	return -EINVAL;
+	return ret;
 }
 
 int argconfig_parse_subopt_string(char *string, char **options,
@@ -372,6 +381,7 @@ int argconfig_parse_subopt_string(char *string, char **options,
 {
 	char **o = options;
 	char *tmp;
+	size_t toklen;
 
 	if (!string || !strlen(string)) {
 		*(o++) = NULL;
@@ -382,7 +392,6 @@ int argconfig_parse_subopt_string(char *string, char **options,
 	tmp = calloc(strlen(string) + 2, 1);
 	strcpy(tmp, string);
 
-	size_t toklen;
 	toklen = strcspn(tmp, "=");
 
 	if (!toklen) {
