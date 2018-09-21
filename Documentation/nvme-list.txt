@@ -22,11 +22,6 @@ OPTIONS
 	Set the reporting format to 'normal' or 'json'. Only one output
 	format can be used at a time.
 
-ENVIRONMENT
------------
-PCI_IDS_PATH - Full path of pci.ids file in case nvme could not find it in common locations.
-
-
 EXAMPLES
 --------
 No examples yet.

@@ -9,7 +9,7 @@ SYNOPSIS
 --------
 [verse]
 'nvme telemetry-log' <device> [--output-file=<file> | -o <file>]
-		      [--host-generate=<gen> | -g <gen>]
+		      [--host-generate=<gen> | -h <gen>]
 
 DESCRIPTION
 -----------
@@ -28,18 +28,12 @@ OPTIONS
 --output-file=<file>::
 	File name to which raw binary data will be saved to.
 
--g <gen>::
+-h <gen>::
 --host-generate=<gen>::
 	If set to 1, controller shall capture the Telemetry Host-Initiated data
 	representing the internal state of the controller at the time the
 	associated Get Log Page command is processed.
 	If cleated to 0, controller shall _not_ update this data.
-
--d <da>::
---data-area=<da>::
-	Retrieves the specific data area requested. Valid inputs are 1,2,3. If
-	this option is not specified, the default value is 3, since that will
-	always give the user all three data areas.
 
 EXAMPLES
 --------

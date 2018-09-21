@@ -15,7 +15,6 @@ SYNOPSIS
 		[--host-traddr=<traddr>   | -w <traddr>]
 		[--hostnqn=<hostnqn>      | -q <hostnqn>]
 		[--keep-alive-tmo=<#>     | -k <#>]
-		[--ctrl-loss-tmo=<#>	  | -l <#>]
 		[--raw=<filename>         | -r <filename>]
 
 DESCRIPTION
