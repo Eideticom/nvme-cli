@@ -56,6 +56,7 @@ struct eid_idns_noload {
 struct eid_idctrl_noload {
 	__le32	hw_build_date;
 	__le32  fw_build_date;
+    __le32  hw_system_ver;
 };
 
 static unsigned int eid_check_item(struct list_item *item)
@@ -239,19 +240,21 @@ static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int m
 	}
 }
 
-static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, char *fw_build_str, int human)
+static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
+									 char *fw_build_str, char *hw_arch_str, char *hw_ver_str, int human)
 {
 	struct json_object *root;
-
 	root = json_create_object();
 
 	if (human) {
 		json_object_add_value_string(root, "hw_build_date", hw_build_str);
 		json_object_add_value_string(root, "fw_build_date", fw_build_str);
+		json_object_add_value_string(root, "hw_system_version", hw_ver_str);
 	}
 	else {
 		json_object_add_value_uint(root, "hw_build_date", le32_to_cpu(eid_idctrl->hw_build_date));
 		json_object_add_value_uint(root, "fw_build_date", le32_to_cpu(eid_idctrl->fw_build_date));
+		json_object_add_value_uint(root, "hw_system_version", le32_to_cpu(eid_idctrl->hw_system_ver));
 	}
 
 	json_print_object(root, NULL);
@@ -259,14 +262,17 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 	json_free_object(root);
 }
 
-static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, char *fw_build_str, int human)
+static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
+								char *fw_build_str, char *hw_arch_str, char *hw_ver_str, int human)
 {
-	if (!human) {
-		printf("hw_build_date\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
-		printf("fw_build_date\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
+	if (human) {
+		printf("hw_build_date\t\t: %s\n", hw_build_str);
+		printf("fw_build_date\t\t: %s\n", fw_build_str);
+		printf("hw_system_version\t: %s\n", hw_ver_str);
 	} else {
-		printf("hw_build_date\t: %s\n", hw_build_str);
-		printf("fw_build_date\t: %s\n", fw_build_str);
+		printf("hw_build_date\t\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
+		printf("fw_build_date\t\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
+		printf("hw_system_version\t: 0x%-8.8x\n", eid_idctrl->hw_system_ver);
 	}
 }
 
@@ -275,6 +281,8 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 	int human = mode & HUMAN;
 	char hw_build_str[21];
 	char fw_build_str[21];
+    char hw_arch_str[18];
+    char hw_ver_str[23];
 
 	// Pull out the data
 	unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
@@ -297,11 +305,47 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 	sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
 		fw_day, fw_hour, fw_minute, fw_second);
 
+    unsigned int hw_arch_type = ((eid_idctrl->hw_system_ver >> 8) & 0xFF00u);
+    unsigned int hw_version   = ((eid_idctrl->hw_system_ver >> 0) & 0x00FFu);
+
+	switch (hw_arch_type) {
+		case 1:
+			strncpy(hw_arch_str, "NVMe Single Core", sizeof(hw_arch_str));
+			break;
+		case 2:
+			strncpy(hw_arch_str, "NVMe Multi Core", sizeof(hw_arch_str));
+			break;
+		default:
+			strncpy(hw_arch_str, "Unknown", sizeof(hw_arch_str));
+			break;
+	}
+
+	switch (hw_version) {
+		case 1:
+			strncpy(hw_ver_str, "Flash GT Plus (250sp)", sizeof(hw_ver_str));
+			break;
+		case 2:
+			strncpy(hw_ver_str, "AlphaData 9v3", sizeof(hw_ver_str));
+			break;
+		case 3:
+			strncpy(hw_ver_str, "Bittware U2 Series 1", sizeof(hw_ver_str));
+			break;
+		case 4:
+			strncpy(hw_ver_str, "Bittware U2 Series 2", sizeof(hw_ver_str));
+			break;
+		case 5:
+			strncpy(hw_ver_str, "Xilinx VCU1525 v1.1", sizeof(hw_ver_str));
+			break;
+		default:
+			strncpy(hw_ver_str, "Unknown", sizeof(hw_ver_str));
+			break;
+	}
+
 	if (fmt == JSON)
-		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, human);
+		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_arch_str, hw_ver_str, human);
 	else {
 		printf("Eideticom NVME Identify Controller:\n");
-		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, human);
+		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_arch_str, hw_ver_str, human);
 	}
 }
 
