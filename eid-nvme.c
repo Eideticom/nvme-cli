@@ -102,7 +102,7 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	int as_bre = (status & 0x20000) >> 17;
 	int as_bwe = (status & 0x40000) >> 18;
 	__u8 as_inver = (status & 0x780000) >> 19;
-	int as_ioe =   (status & 0x00800000) >> 23;
+	int as_sjob =   (status & 0x00800000) >> 23;
 	__u8 upper_rsvd = (status & 0x0F000000) >> 24;
 	int as_rdone = (status & 0x10000000) >> 28;
 	int as_srdy =  (status & 0x20000000) >> 29;
@@ -116,7 +116,7 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	if (upper_rsvd)
 		printf("\t[27:24]\t: 0x%x\tReserved\n", upper_rsvd);
 
-	printf("\t[23:23]\t: %d\tIn-Order Enable\n", as_ioe);
+	printf("\t[23:23]\t: %d\tSingle Job Enable\n", as_sjob);
 	printf("\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
 
 	printf("\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
