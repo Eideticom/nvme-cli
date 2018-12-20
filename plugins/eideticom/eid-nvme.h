@@ -1,5 +1,5 @@
 #undef CMD_INC_FILE
-#define CMD_INC_FILE eid-nvme
+#define CMD_INC_FILE plugins/eideticom/eid-nvme
 
 #if !defined(EIDETICOM_NVME) || defined(CMD_HEADER_MULTI_READ)
 #define EIDETICOM_NVME
