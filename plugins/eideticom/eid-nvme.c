@@ -339,9 +339,6 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
  * List all the Eideticom namespaces in the system and identify the
  * accerlation function provided by that namespace. We base this off
  * the Huawei code. Ideally we'd refactor this a bit. That is a TBD.
- * TBD: The code in scan_device_filter has been made static in 
- * nvme.c linux-nvme. We'll need to either make our own copy before
- * pull requesting upstream.
  */
 
 static int eid_list(int argc, char **argv, struct command *command,
@@ -420,6 +417,7 @@ static int eid_id_ctrl(int argc, char **argv, struct command *command,
 	const char *human_readable = "show infos in readable format";
 	const char *output_format = "Output format: normal|json";
 	struct nvme_id_ctrl ctrl;
+	struct list_item temp_list_item;
 	struct stat nvme_stat;
 	unsigned int flags = 0;
 
@@ -462,7 +460,13 @@ static int eid_id_ctrl(int argc, char **argv, struct command *command,
 
 	err = nvme_identify_ctrl(fd, &ctrl);
 	if (!err) {
-		eid_nvme_id_ctrl_vs((struct eid_idctrl_noload *) &ctrl.vs, flags, fmt);
+		temp_list_item.ctrl = ctrl;
+		if (eid_check_item(&temp_list_item)) {
+			eid_nvme_id_ctrl_vs((struct eid_idctrl_noload *) &ctrl.vs, flags, fmt);
+		}
+		else {
+			fprintf(stderr, "Not an Eideticom device\n");
+		}
 	} else if (err > 0) {
 		fprintf(stderr, "NVMe Status:%s(%x)\n",
 			nvme_status_to_string(err), err);
@@ -486,6 +490,8 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 	const char *human_readable = "show infos in readable format";
 	const char *namespace_id = "identifier of desired controller";
 	const char *output_format = "Output format: normal|json";
+	struct nvme_id_ctrl ctrl;
+	struct list_item temp_list_item;
 	struct nvme_id_ns ns;
 	struct stat nvme_stat;
 	unsigned int flags = 0;
@@ -536,6 +542,16 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 
 	if (cfg.human_readable)
 		flags |= HUMAN;
+
+
+	err = nvme_identify_ctrl(fd, &ctrl);
+	if (!err) {
+		temp_list_item.ctrl = ctrl;
+		if (!eid_check_item(&temp_list_item)) {
+			fprintf(stderr, "Not an Eideticom device\n");
+			goto close_fd;
+		}
+	}
 
 	err = nvme_identify_ns(fd, cfg.namespace_id, 0, &ns);
 	if (!err) {
