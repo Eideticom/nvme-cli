@@ -332,7 +332,7 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 			break;
 	}
 
-	sprintf(fw_commit_str, "%x%x%x%x%x", eid_idctrl->fw_commit_sha[0], 
+	sprintf(fw_commit_str, "%08x%08x%08x%08x%08x", eid_idctrl->fw_commit_sha[0], 
 		eid_idctrl->fw_commit_sha[1], eid_idctrl->fw_commit_sha[2],
 		eid_idctrl->fw_commit_sha[3], eid_idctrl->fw_commit_sha[4]);
 
