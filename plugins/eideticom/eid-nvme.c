@@ -57,7 +57,10 @@ struct eid_idctrl_noload {
 	__le32	hw_build_date;
 	__le32  fw_build_date;
     __le32  hw_system_ver;
+	__le32	work_item;
 	__le32  fw_commit_sha[5];
+	__le32	hw_commit_sha[5];
+	__le32  compiled_fw_commit_sha[5];
 };
 
 static unsigned int eid_check_item(struct list_item *item)
@@ -242,7 +245,8 @@ static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int m
 }
 
 static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
-									 char *fw_build_str, char *hw_ver_str, char *fw_commit_str, int human)
+									 char *fw_build_str, char *hw_ver_str, char *fw_commit_str, 
+									 char *hw_commit_str, char *compiled_fw_commit_str, int human)
 {
 	struct json_object *root;
 	root = json_create_object();
@@ -258,26 +262,33 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 		json_object_add_value_uint(root, "hw_system_version", le32_to_cpu(eid_idctrl->hw_system_ver));
 	}
 
+	json_object_add_value_uint(root, "work_item", le32_to_cpu(eid_idctrl->work_item));
 	json_object_add_value_string(root, "fw_commit_sha", fw_commit_str);
+	json_object_add_value_string(root, "hw_commit_sha", hw_commit_str);
+	json_object_add_value_string(root, "compiled_fw_commit_sha", compiled_fw_commit_str);
 	json_print_object(root, NULL);
 	printf("\n");
 	json_free_object(root);
 }
 
 static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
-								char *fw_build_str, char *hw_ver_str, char *fw_commit_str, int human)
+								char *fw_build_str, char *hw_ver_str, char *fw_commit_str, 
+								char *hw_commit_str, char *compiled_fw_commit_str, int human)
 {
 	if (human) {
-		printf("hw_build_date\t\t: %s\n", hw_build_str);
-		printf("fw_build_date\t\t: %s\n", fw_build_str);
-		printf("hw_system_version\t: %s\n", hw_ver_str);
+		printf("hw_build_date\t\t\t: %s\n", hw_build_str);
+		printf("fw_build_date\t\t\t: %s\n", fw_build_str);
+		printf("hw_system_version\t\t: %s\n", hw_ver_str);
 	} else {
-		printf("hw_build_date\t\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
-		printf("fw_build_date\t\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
-		printf("hw_system_version\t: 0x%-8.8x\n", eid_idctrl->hw_system_ver);
+		printf("hw_build_date\t\t\t: 0x%-8.8x\n", eid_idctrl->hw_build_date);
+		printf("fw_build_date\t\t\t: 0x%-8.8x\n", eid_idctrl->fw_build_date);
+		printf("hw_system_version\t\t: 0x%-8.8x\n", eid_idctrl->hw_system_ver);
 	}
 
-	printf("fw_commit_sha\t\t: %s\n", fw_commit_str);
+	printf("work_item\t\t\t: %d\n", eid_idctrl->work_item);
+	printf("fw_commit_sha\t\t\t: %s\n", fw_commit_str);
+	printf("hw_commit_sha\t\t\t: %s\n", hw_commit_str);
+	printf("compiled_fw_commit_sha\t\t: %s\n", compiled_fw_commit_str);
 }
 
 static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned int mode, int fmt)
@@ -287,6 +298,8 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 	char fw_build_str[21];
     char hw_ver_str[23];
 	char fw_commit_str[41];
+	char hw_commit_str[41];
+	char compiled_fw_commit_str[41];
 
 	// Pull out the data
 	unsigned int hw_day    =  ((eid_idctrl->hw_build_date >> 27) & 0x1Fu);
@@ -336,11 +349,19 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 		eid_idctrl->fw_commit_sha[1], eid_idctrl->fw_commit_sha[2],
 		eid_idctrl->fw_commit_sha[3], eid_idctrl->fw_commit_sha[4]);
 
+	sprintf(hw_commit_str, "%08x%08x%08x%08x%08x", eid_idctrl->hw_commit_sha[0], 
+		eid_idctrl->hw_commit_sha[1], eid_idctrl->hw_commit_sha[2],
+		eid_idctrl->hw_commit_sha[3], eid_idctrl->hw_commit_sha[4]);
+
+	sprintf(compiled_fw_commit_str, "%08x%08x%08x%08x%08x", eid_idctrl->compiled_fw_commit_sha[0], 
+		eid_idctrl->compiled_fw_commit_sha[1], eid_idctrl->compiled_fw_commit_sha[2],
+		eid_idctrl->compiled_fw_commit_sha[3], eid_idctrl->compiled_fw_commit_sha[4]);
+
 	if (fmt == JSON)
-		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_ver_str, fw_commit_str, human);
+		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_ver_str, fw_commit_str, hw_commit_str, compiled_fw_commit_str, human);
 	else {
 		printf("Eideticom NVME Identify Controller:\n");
-		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_ver_str, fw_commit_str, human);
+		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_ver_str, fw_commit_str, hw_commit_str, compiled_fw_commit_str, human);
 	}
 }
 
