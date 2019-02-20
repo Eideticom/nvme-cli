@@ -41,16 +41,22 @@
 
 static const char *dev = "/dev/";
 
-struct eid_idns_noload {
+struct eid_idns_accel {
 	__le32	acc_status;
-	char	hls[12];
-	char	acc_name[48];
-	__le32	acc_lock;
-	char	reserved[12];
-	__le32	acc_ver;
-	__le32	acc_cfg[6];
-	__le32	acc_priv_len;
-	char	acc_priv[3600];
+	__le32	acc_job_state;
+	__le32	acc_handshake;
+	char	reserved[8];
+	__le32	acc_spec_len;
+	char	acc_spec[104];
+};
+
+struct eid_idns_noload {
+	__le32					ns_type;
+	char					ns_name[48];
+	__le32					ns_ver;
+	char					reserved[196];
+	__le32					ns_num_accels;
+	struct eid_idns_accel 	ns_accels[27];
 };
 
 struct eid_idctrl_noload {
@@ -76,9 +82,9 @@ static void eid_print_list_item(struct list_item list_item)
 	struct eid_idns_noload *eid_idns =
 		(struct eid_idns_noload *) &list_item.ns.vs;
 
-	printf("%-16s %-64.64s 0x%-8.8x 0x%-8.8x\n", list_item.node,
-	       eid_idns->acc_name, (unsigned int) eid_idns->acc_ver,
-	       (unsigned int) eid_idns->acc_status);
+	printf("%-16s %-64.64s 0x%-8.8x %d\n", list_item.node,
+	       eid_idns->ns_name, (unsigned int) eid_idns->ns_ver,
+	       (unsigned int) eid_idns->ns_num_accels);
 }
 
 static void eid_print_list_items(struct list_item *list_items, unsigned int len)
@@ -86,7 +92,7 @@ static void eid_print_list_items(struct list_item *list_items, unsigned int len)
 	unsigned int i;
 
 	printf("%-16s %-64s %-10s %-10s\n",
-	       "Node", "Accelerator Name", "Version", "Status");
+	       "Node", "Accelerator Name", "Version", "Number of Accelerators");
 	printf("%-16s %-64s %-10s %-10s\n",
 	       "----------------",
 	       "----------------------------------------------------------------",
@@ -113,31 +119,31 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	int as_rdack = (status & 0x40000000) >> 30;
 	int as_wrack = (status & 0x80000000) >> 31;
 
-	printf("\t[31:31]\t: %d\tWrite acknowledge clear\n", as_wrack);
-	printf("\t[30:30]\t: %d\tRead acknowledge clear\n", as_rdack);
-	printf("\t[29:29]\t: %d\tStatus Ready\n", as_srdy);
-	printf("\t[28:28]\t: %d\tRead Done\n", as_rdone);
+	printf("\t\t[31:31]\t: %d\tWrite acknowledge clear\n", as_wrack);
+	printf("\t\t[30:30]\t: %d\tRead acknowledge clear\n", as_rdack);
+	printf("\t\t[29:29]\t: %d\tStatus Ready\n", as_srdy);
+	printf("\t\t[28:28]\t: %d\tRead Done\n", as_rdone);
 	if (upper_rsvd)
-		printf("\t[27:24]\t: 0x%x\tReserved\n", upper_rsvd);
+		printf("\t\t[27:24]\t: 0x%x\tReserved\n", upper_rsvd);
 
-	printf("\t[23:23]\t: %d\tSingle Job Enable\n", as_sjob);
-	printf("\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
+	printf("\t\t[23:23]\t: %d\tSingle Job Enable\n", as_sjob);
+	printf("\t\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
 
-	printf("\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
+	printf("\t\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
 	if (as_bwe)
 		printf("enabled ");
 	else
 		printf("NOT enabled ");
 	printf("(AS.BWE)\n");
 
-	printf("\t[17:17]\t: %d\tBlocking read functionality is ", as_bre);
+	printf("\t\t[17:17]\t: %d\tBlocking read functionality is ", as_bre);
 	if (as_bre)
 		printf("enabled ");
 	else
 		printf("NOT enabled ");
 	printf("(AS.BRE)\n");
 
-	printf("\t[16:16]\t: %d\tStatus code field is ", as_sen);
+	printf("\t\t[16:16]\t: %d\tStatus code field is ", as_sen);
 	if (as_sen)
 		printf("enabled ");
 	else
@@ -146,37 +152,37 @@ static void eid_show_id_ns_vs_status(__le32 status)
 
 	if (as_sen) {
 		if (as_sc)
-			printf("\t[15:8]\t: %d\tStatus code 0x%x occurred "
+			printf("\t\t[15:8]\t: %d\tStatus code 0x%x occurred "
 				"(AS.SC)\n", as_sc, as_sc);
 		else
-			printf("\t[15:8]\t: %d\tNo status code has been "
+			printf("\t\t[15:8]\t: %d\tNo status code has been "
 			"reported (AS.SC)\n", as_sc);
 	}
 
 	if (lower_rsvd)
-		printf("\t[7:3]\t: 0x%x\tReserved\n", lower_rsvd);
+		printf("\t\t[7:3]\t: 0x%x\tReserved\n", lower_rsvd);
 
 	if (as_wrrdy) {
-		printf("\t[2:2]\t: %d\tAccelerator is ready for "
+		printf("\t\t[2:2]\t: %d\tAccelerator is ready for "
 			"the next write command ", as_wrrdy);
 	} else {
-		printf("\t[2:2]\t: %d\tAccelerator is NOT ready for "
+		printf("\t\t[2:2]\t: %d\tAccelerator is NOT ready for "
 			"the next write command ", as_wrrdy);
 	}
 	printf("(AS.WRRDY)\n");
 
 	if (as_rdrdy)
-		printf("\t[1:1]\t: %d\tAccelerator is ready for "
+		printf("\t\t[1:1]\t: %d\tAccelerator is ready for "
 			"the next read command ", as_rdrdy);
 	else
-		printf("\t[1:1]\t: %d\tAccelerator is NOT ready for "
+		printf("\t\t[1:1]\t: %d\tAccelerator is NOT ready for "
 			"the next read command ", as_rdrdy);
 	printf("(AS.RDRDY)\n");
 
 	if (as_en)
-		printf("\t[0:0]\t: %d\tAccelerator is enabled ", as_en);
+		printf("\t\t[0:0]\t: %d\tAccelerator is enabled ", as_en);
 	else
-		printf("\t[0:0]\t: %d\tAccelerator is NOT enabled ", as_en);
+		printf("\t\t[0:0]\t: %d\tAccelerator is NOT enabled ", as_en);
 	printf("(AS.EN)\n\n");
 }
 
@@ -184,51 +190,68 @@ static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
 {
 	unsigned int i;
 	struct json_object *root;
-	struct json_array *acc_cfg;
+	struct json_object *acc_cfg;
+	struct eid_idns_accel *accel;
+	char accel_key[9];
+
 
 	root = json_create_object();
 
-	json_object_add_value_string(root, "acc_name", eid->acc_name);
-	json_object_add_value_uint(root, "acc_status", eid->acc_status);
-	json_object_add_value_uint(root, "acc_lock", eid->acc_lock);
-	json_object_add_value_uint(root, "acc_version", eid->acc_ver);
+	json_object_add_value_uint(root, "ns_type", eid->ns_type);
+	json_object_add_value_string(root, "ns_name", eid->ns_name);
+	json_object_add_value_uint(root, "ns_ver", eid->ns_ver);
+	json_object_add_value_uint(root, "ns_num_accels", eid->ns_num_accels);
 
-	acc_cfg = json_create_array();
+	if (eid->ns_num_accels > 27 || eid->ns_num_accels < 1) {
+		perror("ns_num_accels not valid (must be between 1 and 27)");
+		goto free_json;
+	}
 
-	for (i = 0; i < 24/4; ++i)
-		json_array_add_value_uint(acc_cfg, eid->acc_cfg[i]);
-
-	json_object_add_value_array(root, "acc_cfg", acc_cfg);
-	json_object_add_value_uint(root, "acc_spec_bytes", eid->acc_priv_len);
-
-	// TBD: Add something here for acc_user_space?
-
+	for (i=0; i < eid->ns_num_accels; ++i) {
+		acc_cfg = json_create_object();
+		accel = &eid->ns_accels[i];
+		json_object_add_value_uint(acc_cfg, "accel_status", accel->acc_status);
+		json_object_add_value_uint(acc_cfg, "accel_job_state", accel->acc_job_state);
+		json_object_add_value_uint(acc_cfg, "accel_handshake", accel->acc_handshake);
+		json_object_add_value_uint(acc_cfg, "accel_spec_len", accel->acc_spec_len);
+		
+		// TBD: Add something here for the acc_spec
+		snprintf(accel_key, 9, "accel_%d", i);
+		json_object_add_value_object(root, accel_key, acc_cfg);
+	}
+	
 	json_print_object(root, NULL);
 	printf("\n");
+free_json:
 	json_free_object(root);
+}
+
+static void eid_show_id_ns_vs_accel(struct eid_idns_accel *accel, int human)
+{
+	printf("\taccel_status\t: 0x%-8.8x\n", accel->acc_status);
+	if (human)
+		eid_show_id_ns_vs_status(accel->acc_status);
+	printf("\taccel_job_state\t: 0x%-8.8x\n", accel->acc_job_state);
+	printf("\taccel_handshake\t: 0x%-8.8x\n", accel->acc_handshake);
+	printf("\taccel_spec_len\t: %d\n", accel->acc_spec_len);
+	if (accel->acc_spec_len)
+		d((unsigned char *)accel->acc_spec, accel->acc_spec_len, 16, 1);
 }
 
 static void eid_show_id_ns_vs(struct eid_idns_noload *eid, int human)
 {
 	unsigned int i;
-	printf("acc_name\t: %s\n", eid->acc_name);
-	printf("acc_status\t: 0x%-8.8x\n", eid->acc_status);
-	if (human)
-		eid_show_id_ns_vs_status(eid->acc_status);
-	printf("acc_lock\t: 0x%-8.8x", eid->acc_lock);
-	if (human && eid->acc_lock)
-		printf("\tAccelerator is locked with lock 0x%x\n", eid->acc_lock);
-	else if (human && !eid->acc_lock)
-		printf("\tAccelerator is NOT locked\n");
-	else
-		printf("\n");
-	printf("acc_version\t: 0x%-8.8x\n", eid->acc_ver);
-	for (i = 0; i < 24/4; ++i)
-		printf("acc_cfg[%d]\t: 0x%-8.8x\n", i, eid->acc_cfg[i]);
-	printf("acc_spec_bytes\t: %d\n", eid->acc_priv_len);
-	if (eid->acc_priv_len) {
-		printf("acc_user_space\t:\n");
-		d((unsigned char *)eid->acc_priv, eid->acc_priv_len, 16, 1);
+	printf("ns_type\t\t: 0x%-8.8x\n", eid->ns_type);
+	printf("ns_name\t\t: %s\n", eid->ns_name);
+	printf("ns_ver\t\t: 0x%-8.8x\n", eid->ns_ver);
+	printf("ns_num_accels\t: %d\n", eid->ns_num_accels);
+	if (eid->ns_num_accels > 27 || eid->ns_num_accels < 1) {
+		perror("ns_num_accels not valid (must be between 1 and 27)");
+		return;
+	}
+	for (i=0; i < eid->ns_num_accels; ++i) {
+		printf("Accelerator %d:\n", i);
+		eid_show_id_ns_vs_accel(&eid->ns_accels[i], human);
 	}
 }
 
