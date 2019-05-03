@@ -190,9 +190,9 @@ static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
 {
 	unsigned int i;
 	struct json_object *root;
-	struct json_object *acc_cfg;
+	struct json_object *accel_info;
+	struct json_array *accels_list;
 	struct eid_idns_accel *accel;
-	char accel_key[9];
 
 
 	root = json_create_object();
@@ -207,18 +207,17 @@ static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
 		goto free_json;
 	}
 
+	accels_list = json_create_array();
 	for (i=0; i < eid->ns_num_accels; ++i) {
-		acc_cfg = json_create_object();
-		accel = &eid->ns_accels[i];
-		json_object_add_value_uint(acc_cfg, "accel_status", accel->acc_status);
-		json_object_add_value_uint(acc_cfg, "accel_job_state", accel->acc_job_state);
-		json_object_add_value_uint(acc_cfg, "accel_handshake", accel->acc_handshake);
-		json_object_add_value_uint(acc_cfg, "accel_spec_len", accel->acc_spec_len);
-		
-		// TBD: Add something here for the acc_spec
-		snprintf(accel_key, 9, "accel_%d", i);
-		json_object_add_value_object(root, accel_key, acc_cfg);
+		accel_info = json_create_object();
+		accel = &eid->ns_accels[0];
+		json_object_add_value_uint(accel_info, "accel_status", accel->acc_status);
+		json_object_add_value_uint(accel_info, "accel_job_state", accel->acc_job_state);
+		json_object_add_value_uint(accel_info, "accel_handshake", accel->acc_handshake);
+		json_object_add_value_uint(accel_info, "accel_spec_len", accel->acc_spec_len);
+		json_array_add_value_object(accels_list, accel_info);
 	}
+	json_object_add_value_array(root, "accel_info", accels_list);
 	
 	json_print_object(root, NULL);
 	printf("\n");
