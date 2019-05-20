@@ -268,7 +268,7 @@ static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int m
 
 static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
 									 char *fw_build_str, char *hw_ver_str, char *fw_commit_str, 
-									 char *hw_commit_str, char *compiled_fw_commit_str, int human)
+									 char *hw_commit_str, char *compiled_fw_commit_str, char *sys_ver, int human)
 {
 	struct json_object *root;
 	root = json_create_object();
@@ -285,6 +285,7 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 	}
 
 	json_object_add_value_uint(root, "work_item", le32_to_cpu(eid_idctrl->work_item));
+	json_object_add_value_string(root, "system_version", sys_ver);
 	json_object_add_value_string(root, "fw_commit_sha", fw_commit_str);
 	json_object_add_value_string(root, "hw_commit_sha", hw_commit_str);
 	json_object_add_value_string(root, "compiled_fw_commit_sha", compiled_fw_commit_str);
@@ -295,7 +296,7 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 
 static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
 								char *fw_build_str, char *hw_ver_str, char *fw_commit_str, 
-								char *hw_commit_str, char *compiled_fw_commit_str, int human)
+								char *hw_commit_str, char *compiled_fw_commit_str, char *sys_ver, int human)
 {
 	if (human) {
 		printf("hw_build_date\t\t\t: %s\n", hw_build_str);
@@ -307,6 +308,7 @@ static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_b
 		printf("hw_system_version\t\t: 0x%-8.8x\n", eid_idctrl->hw_system_ver);
 	}
 
+	printf("system_version\t\t\t: %s\n", sys_ver);
 	printf("work_item\t\t\t: %d\n", eid_idctrl->work_item);
 	printf("fw_commit_sha\t\t\t: %s\n", fw_commit_str);
 	printf("hw_commit_sha\t\t\t: %s\n", hw_commit_str);
@@ -318,9 +320,10 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 	int human = mode & HUMAN;
 	char hw_build_str[21];
 	char fw_build_str[21];
-    char hw_ver_str[23];
+    char hw_board_str[23];
 	char fw_commit_str[41];
 	char hw_commit_str[41];
+	char sys_ver[6];
 	char compiled_fw_commit_str[41];
 
 	// Pull out the data
@@ -344,46 +347,49 @@ static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned i
 	sprintf(fw_build_str, "%04d-%02d-%02d %02d:%02d:%02d", fw_year+2000, fw_month,
 		fw_day, fw_hour, fw_minute, fw_second);
 
-    unsigned int hw_version   = ((eid_idctrl->hw_system_ver >> 0) & 0x00FFu);
+    unsigned int hw_board_version = eid_idctrl->hw_system_ver & 0x00FFu;
 
-	switch (hw_version) {
+	switch (hw_board_version) {
 		case 1:
-			strncpy(hw_ver_str, "Flash GT Plus (250sp)", sizeof(hw_ver_str));
+			strncpy(hw_board_str, "Flash GT Plus (250sp)", sizeof(hw_board_str));
 			break;
 		case 2:
-			strncpy(hw_ver_str, "AlphaData 9v3", sizeof(hw_ver_str));
+			strncpy(hw_board_str, "AlphaData 9v3", sizeof(hw_board_str));
 			break;
 		case 3:
-			strncpy(hw_ver_str, "Bittware U2 Series 1", sizeof(hw_ver_str));
+			strncpy(hw_board_str, "Bittware U2 Series 1", sizeof(hw_board_str));
 			break;
 		case 4:
-			strncpy(hw_ver_str, "Bittware U2 Series 2", sizeof(hw_ver_str));
+			strncpy(hw_board_str, "Bittware U2 Series 2", sizeof(hw_board_str));
 			break;
 		case 5:
-			strncpy(hw_ver_str, "Xilinx VCU1525 v1.1", sizeof(hw_ver_str));
+			strncpy(hw_board_str, "Xilinx VCU1525 v1.1", sizeof(hw_board_str));
 			break;
 		default:
-			strncpy(hw_ver_str, "Unknown", sizeof(hw_ver_str));
+			strncpy(hw_board_str, "Unknown", sizeof(hw_board_str));
 			break;
 	}
+	unsigned int major_ver = ((eid_idctrl->hw_system_ver & 0xF000u) >> 12u);
+	unsigned int minor_ver = ((eid_idctrl->hw_system_ver & 0x0F00u) >> 8u);
+	snprintf(sys_ver, sizeof(sys_ver), "%d.%d", major_ver, minor_ver);
 
-	sprintf(fw_commit_str, "%08x%08x%08x%08x%08x", eid_idctrl->fw_commit_sha[0], 
+	snprintf(fw_commit_str, sizeof(fw_commit_str), "%08x%08x%08x%08x%08x", eid_idctrl->fw_commit_sha[0], 
 		eid_idctrl->fw_commit_sha[1], eid_idctrl->fw_commit_sha[2],
 		eid_idctrl->fw_commit_sha[3], eid_idctrl->fw_commit_sha[4]);
 
-	sprintf(hw_commit_str, "%08x%08x%08x%08x%08x", eid_idctrl->hw_commit_sha[0], 
+	snprintf(hw_commit_str, sizeof(hw_commit_str), "%08x%08x%08x%08x%08x", eid_idctrl->hw_commit_sha[0], 
 		eid_idctrl->hw_commit_sha[1], eid_idctrl->hw_commit_sha[2],
 		eid_idctrl->hw_commit_sha[3], eid_idctrl->hw_commit_sha[4]);
 
-	sprintf(compiled_fw_commit_str, "%08x%08x%08x%08x%08x", eid_idctrl->compiled_fw_commit_sha[0], 
+	snprintf(compiled_fw_commit_str, sizeof(compiled_fw_commit_str), "%08x%08x%08x%08x%08x", eid_idctrl->compiled_fw_commit_sha[0], 
 		eid_idctrl->compiled_fw_commit_sha[1], eid_idctrl->compiled_fw_commit_sha[2],
 		eid_idctrl->compiled_fw_commit_sha[3], eid_idctrl->compiled_fw_commit_sha[4]);
 
 	if (fmt == JSON)
-		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_ver_str, fw_commit_str, hw_commit_str, compiled_fw_commit_str, human);
+		json_eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_board_str, fw_commit_str, hw_commit_str, compiled_fw_commit_str, sys_ver, human);
 	else {
 		printf("Eideticom NVME Identify Controller:\n");
-		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_ver_str, fw_commit_str, hw_commit_str, compiled_fw_commit_str, human);
+		eid_show_id_ctrl_vs(eid_idctrl, hw_build_str, fw_build_str, hw_board_str, fw_commit_str, hw_commit_str, compiled_fw_commit_str, sys_ver, human);
 	}
 }
 
