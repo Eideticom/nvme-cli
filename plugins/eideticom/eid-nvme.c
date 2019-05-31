@@ -109,11 +109,12 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	__u8 lower_rsvd = (status & 0x000000F8) >> 3;
 	__u8 as_sc = (status & 0xFF00) >> 8;
 	int as_sen = (status & 0x10000) >> 16;
-	int as_bre = (status & 0x20000) >> 17;
-	int as_bwe = (status & 0x40000) >> 18;
+	int as_be = (status & 0x20000) >> 17;
+	int mid_rsvd = (status & 0x40000) >> 18;
 	__u8 as_inver = (status & 0x780000) >> 19;
 	int as_sjob =   (status & 0x00800000) >> 23;
-	__u8 upper_rsvd = (status & 0x0F000000) >> 24;
+	int as_aow = 	(status & 0x01000000) >> 24;
+	__u8 upper_rsvd = (status & 0x0E000000) >> 25;
 	int as_rdone = (status & 0x10000000) >> 28;
 	int as_srdy =  (status & 0x20000000) >> 29;
 	int as_rdack = (status & 0x40000000) >> 30;
@@ -126,22 +127,18 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	if (upper_rsvd)
 		printf("\t\t[27:24]\t: 0x%x\tReserved\n", upper_rsvd);
 
+	printf("\t\t[24:24]\t: %d\tAllow Overprovisioned Writes\n", as_aow);
 	printf("\t\t[23:23]\t: %d\tSingle Job Enable\n", as_sjob);
 	printf("\t\t[22:19]\t: %d\tAccelerator Interface Version\n", as_inver);
+	if (mid_rsvd)
+		printf("\t\t[18:18]\t: 0x%x\tReserved\n", mid_rsvd);
 
-	printf("\t\t[18:18]\t: %d\tBlocking write functionality is ", as_bwe);
-	if (as_bwe)
+	printf("\t\t[17:17]\t: %d\tBlocking functionality is ", as_be);
+	if (as_be)
 		printf("enabled ");
 	else
 		printf("NOT enabled ");
-	printf("(AS.BWE)\n");
-
-	printf("\t\t[17:17]\t: %d\tBlocking read functionality is ", as_bre);
-	if (as_bre)
-		printf("enabled ");
-	else
-		printf("NOT enabled ");
-	printf("(AS.BRE)\n");
+	printf("(AS.BE)\n");
 
 	printf("\t\t[16:16]\t: %d\tStatus code field is ", as_sen);
 	if (as_sen)
