@@ -241,8 +241,8 @@ static void eid_show_id_ns_vs(struct eid_idns_noload *eid, int human)
 	printf("ns_name\t\t: %s\n", eid->ns_name);
 	printf("ns_ver\t\t: 0x%-8.8x\n", eid->ns_ver);
 	printf("ns_num_accels\t: %d\n", eid->ns_num_accels);
-	if (eid->ns_num_accels > 27 || eid->ns_num_accels < 1) {
-		perror("ns_num_accels not valid (must be between 1 and 27)");
+	if (eid->ns_num_accels > 8 || eid->ns_num_accels < 1) {
+		perror("ns_num_accels not valid (must be between 1 and 8)");
 		return;
 	}
 	for (i=0; i < eid->ns_num_accels; ++i) {
@@ -592,12 +592,15 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 	if (!cfg.namespace_id && S_ISBLK(nvme_stat.st_mode))
 		cfg.namespace_id = nvme_get_nsid(fd);
 	else if (!cfg.namespace_id)
+	{
 		fprintf(stderr,
 			"Error: requesting namespace-id from non-block device\n");
-
+			err = EINVAL;
+			goto close_fd;
+	}
+	
 	if (cfg.human_readable)
 		flags |= HUMAN;
-
 
 	err = nvme_identify_ctrl(fd, &ctrl);
 	if (!err) {
