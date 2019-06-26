@@ -67,6 +67,7 @@ struct eid_idctrl_noload {
 	__le32  fw_commit_sha[5];
 	__le32	hw_commit_sha[5];
 	__le32  compiled_fw_commit_sha[5];
+	__le32  job_id_count;
 };
 
 static unsigned int eid_check_item(struct list_item *item)
@@ -265,7 +266,8 @@ static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int m
 
 static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
 									 char *fw_build_str, char *hw_ver_str, char *fw_commit_str, 
-									 char *hw_commit_str, char *compiled_fw_commit_str, char *sys_ver, int human)
+									 char *hw_commit_str, char *compiled_fw_commit_str, char *sys_ver, 
+									 int human)
 {
 	struct json_object *root;
 	root = json_create_object();
@@ -286,6 +288,7 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 	json_object_add_value_string(root, "fw_commit_sha", fw_commit_str);
 	json_object_add_value_string(root, "hw_commit_sha", hw_commit_str);
 	json_object_add_value_string(root, "compiled_fw_commit_sha", compiled_fw_commit_str);
+	json_object_add_value_uint(root, "job_id_count", le32_to_cpu(eid_idctrl->job_id_count));
 	json_print_object(root, NULL);
 	printf("\n");
 	json_free_object(root);
@@ -293,7 +296,8 @@ static void json_eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char 
 
 static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_build_str, 
 								char *fw_build_str, char *hw_ver_str, char *fw_commit_str, 
-								char *hw_commit_str, char *compiled_fw_commit_str, char *sys_ver, int human)
+								char *hw_commit_str, char *compiled_fw_commit_str, char *sys_ver,
+								int human)
 {
 	if (human) {
 		printf("hw_build_date\t\t\t: %s\n", hw_build_str);
@@ -310,6 +314,7 @@ static void eid_show_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, char *hw_b
 	printf("fw_commit_sha\t\t\t: %s\n", fw_commit_str);
 	printf("hw_commit_sha\t\t\t: %s\n", hw_commit_str);
 	printf("compiled_fw_commit_sha\t\t: %s\n", compiled_fw_commit_str);
+	printf("job_id_count\t\t\t: %d\n", eid_idctrl->job_id_count);
 }
 
 static void eid_nvme_id_ctrl_vs(struct eid_idctrl_noload *eid_idctrl, unsigned int mode, int fmt)
