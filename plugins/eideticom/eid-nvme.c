@@ -41,22 +41,35 @@
 
 static const char *dev = "/dev/";
 
-struct eid_idns_accel {
-	__le32	acc_status;
-	__le32	acc_job_state;
-	__le32	acc_handshake;
-	char	reserved[8];
-	__le32	acc_spec_len;
-	char	acc_spec[104];
-};
-
 struct eid_idns_noload {
-	__le32					ns_type;
-	char					ns_name[48];
-	__le32					ns_ver;
-	char					reserved[196];
-	__le32					ns_num_accels;
-	struct eid_idns_accel 	ns_accels[27];
+	union {
+		struct idns_v4 {
+			__le32	acc_status;
+			char	hls[12];
+			char	acc_name[48];
+			__le32	acc_lock;
+			char	reserved[12];
+			__le32	acc_ver;
+			__le32	acc_cfg[6];
+			__le32	acc_priv_len;
+			char	acc_priv[3600];
+		} v4;
+		struct idns_v6 {
+			__le32	ns_type;
+			char	ns_name[48];
+			__le32	ns_ver;
+			char	reserved[196];
+			__le32	ns_num_accels;
+			struct eid_idns_accel {
+				__le32	acc_status;
+				__le32	acc_job_state;
+				__le32	acc_handshake;
+				char	reserved[8];
+				__le32	acc_spec_len;
+				char	acc_spec[104];
+			} ns_accels[27];
+		} v6;
+	};
 };
 
 struct eid_idctrl_noload {
@@ -70,36 +83,97 @@ struct eid_idctrl_noload {
 	__le32  job_id_count;
 };
 
-static unsigned int eid_check_item(struct list_item *item)
-{
+enum {
+	NOLOAD_VER_4 = 1,
+	NOLOAD_VER_6 = 2,
+	NUM_VERSIONS
+};
+
+static unsigned int eid_check_item(struct list_item *item) {
 	if (strstr(item->ctrl.mn, "Eideticom") == NULL)
 		return 0;
 
 	return 1;
 }
 
-static void eid_print_list_item(struct list_item list_item)
-{
-	struct eid_idns_noload *eid_idns =
-		(struct eid_idns_noload *) &list_item.ns.vs;
-
-	printf("%-16s %-64.64s 0x%-8.8x %d\n", list_item.node,
-	       eid_idns->ns_name, (unsigned int) eid_idns->ns_ver,
-	       (unsigned int) eid_idns->ns_num_accels);
+static unsigned int get_eid_ver(struct list_item *item) {
+	unsigned int ver;
+	sscanf(item->ctrl.fr, "%d", &ver);
+	return ver;
 }
 
-static void eid_print_list_items(struct list_item *list_items, unsigned int len)
-{
+static void eid_print_list_v4(struct list_item *list_items, unsigned int len) {
 	unsigned int i;
 
+	printf("NoLoad Version 4 Cards:\n");
+	printf("%-16s %-64s %-10s %-10s\n",
+	       "Node", "Accelerator Name", "Version", "Status");
+	printf("%-16s %-64s %-10s %-10s\n",
+	       "----------------",
+	       "----------------------------------------------------------------",
+	       "----------", "----------");
+
+	for (i = 0 ; i < len ; i++) {
+		struct eid_idns_noload *eid_idns =
+		(struct eid_idns_noload *) &list_items[i].ns.vs;
+		if (eid_check_item(&list_items[i]) && get_eid_ver(&list_items[i]) == NOLOAD_VER_4) {
+			printf("%-16s %-64.64s 0x%-8.8x 0x%-8.8x\n", list_items[i].node,
+				eid_idns->v4.acc_name, (unsigned int) eid_idns->v4.acc_ver,
+				(unsigned int) eid_idns->v4.acc_status);
+		}
+	}
+}
+
+static void eid_print_list_v6(struct list_item *list_items, unsigned int len) {
+	unsigned int i;
+
+	printf("NoLoad Version 6 Cards:\n");
 	printf("%-16s %-64s %-10s %-10s\n",
 	       "Node", "Accelerator Name", "Version", "Number of Accelerators");
 	printf("%-16s %-64s %-10s %-10s\n",
 	       "----------------",
 	       "----------------------------------------------------------------",
 	       "----------", "----------");
-	for (i = 0 ; i < len ; i++)
-		eid_print_list_item(list_items[i]);
+
+	for (i = 0 ; i < len ; i++) {
+		struct eid_idns_noload *eid_idns =
+		(struct eid_idns_noload *) &list_items[i].ns.vs;
+		if (eid_check_item(&list_items[i]) && get_eid_ver(&list_items[i]) == NOLOAD_VER_6) {
+			printf("%-16s %-64.64s 0x%-8.8x %d\n", list_items[i].node,
+				eid_idns->v6.ns_name, (unsigned int) eid_idns->v6.ns_ver,
+				(unsigned int) eid_idns->v6.ns_num_accels);
+		}
+	}
+}
+
+static void eid_print_list(struct list_item *list_items, unsigned int len)
+{
+	unsigned int i;
+	unsigned int num_noloads[NUM_VERSIONS];
+	unsigned int ver;
+
+	for(i = 0; i < NUM_VERSIONS; i++)
+		num_noloads[i] = 0;
+
+	// First let's traverse the list and find all versions
+	for(i = 0; i < len; i++) {
+		ver = get_eid_ver(&list_items[i]);
+		if (ver < NUM_VERSIONS)
+			num_noloads[ver]++;
+		else {
+			fprintf(stderr, "error: unrecognized NoLoad type %u", ver);
+			return;
+		}
+	}
+
+	if (num_noloads[NOLOAD_VER_4] > 0)
+		eid_print_list_v4(list_items, len);
+	
+	if (num_noloads[NOLOAD_VER_6] > 0) {
+		if (num_noloads[NOLOAD_VER_4] > 0)
+			printf("\n");
+		eid_print_list_v6(list_items, len);
+	}
 }
 
 static void eid_show_id_ns_vs_status(__le32 status)
@@ -184,7 +258,35 @@ static void eid_show_id_ns_vs_status(__le32 status)
 	printf("(AS.EN)\n\n");
 }
 
-static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
+static void json_eid_show_id_ns_vs_v4(struct eid_idns_noload *eid)
+{
+	unsigned int i;
+	struct json_object *root;
+	struct json_array *acc_cfg;
+
+	root = json_create_object();
+
+	json_object_add_value_string(root, "acc_name", eid->v4.acc_name);
+	json_object_add_value_uint(root, "acc_status", eid->v4.acc_status);
+	json_object_add_value_uint(root, "acc_lock", eid->v4.acc_lock);
+	json_object_add_value_uint(root, "acc_version", eid->v4.acc_ver);
+
+	acc_cfg = json_create_array();
+
+	for (i = 0; i < 24/4; ++i)
+		json_array_add_value_uint(acc_cfg, eid->v4.acc_cfg[i]);
+
+	json_object_add_value_array(root, "acc_cfg", acc_cfg);
+	json_object_add_value_uint(root, "acc_spec_bytes", eid->v4.acc_priv_len);
+
+	// TBD: Add something here for acc_user_space?
+
+	json_print_object(root, NULL);
+	printf("\n");
+	json_free_object(root);
+}
+
+static void json_eid_show_id_ns_vs_v6(struct eid_idns_noload *eid)
 {
 	unsigned int i;
 	struct json_object *root;
@@ -195,20 +297,20 @@ static void json_eid_show_id_ns_vs(struct eid_idns_noload *eid)
 
 	root = json_create_object();
 
-	json_object_add_value_uint(root, "ns_type", eid->ns_type);
-	json_object_add_value_string(root, "ns_name", eid->ns_name);
-	json_object_add_value_uint(root, "ns_ver", eid->ns_ver);
-	json_object_add_value_uint(root, "ns_num_accels", eid->ns_num_accels);
+	json_object_add_value_uint(root, "ns_type", eid->v6.ns_type);
+	json_object_add_value_string(root, "ns_name", eid->v6.ns_name);
+	json_object_add_value_uint(root, "ns_ver", eid->v6.ns_ver);
+	json_object_add_value_uint(root, "ns_num_accels", eid->v6.ns_num_accels);
 
-	if (eid->ns_num_accels > 27 || eid->ns_num_accels < 1) {
+	if (eid->v6.ns_num_accels > 27 || eid->v6.ns_num_accels < 1) {
 		perror("ns_num_accels not valid (must be between 1 and 27)");
 		goto free_json;
 	}
 
 	accels_list = json_create_array();
-	for (i=0; i < eid->ns_num_accels; ++i) {
+	for (i=0; i < eid->v6.ns_num_accels; ++i) {
 		accel_info = json_create_object();
-		accel = &eid->ns_accels[0];
+		accel = &eid->v6.ns_accels[0];
 		json_object_add_value_uint(accel_info, "accel_status", accel->acc_status);
 		json_object_add_value_uint(accel_info, "accel_job_state", accel->acc_job_state);
 		json_object_add_value_uint(accel_info, "accel_handshake", accel->acc_handshake);
@@ -223,7 +325,7 @@ free_json:
 	json_free_object(root);
 }
 
-static void eid_show_id_ns_vs_accel(struct eid_idns_accel *accel, int human)
+static void eid_show_id_ns_vs_v6_accel(struct eid_idns_accel *accel, int human)
 {
 	printf("\taccel_status\t: 0x%-8.8x\n", accel->acc_status);
 	if (human)
@@ -235,32 +337,66 @@ static void eid_show_id_ns_vs_accel(struct eid_idns_accel *accel, int human)
 		d((unsigned char *)accel->acc_spec, accel->acc_spec_len, 16, 1);
 }
 
-static void eid_show_id_ns_vs(struct eid_idns_noload *eid, int human)
-{
+static void eid_show_id_ns_vs_v4(struct eid_idns_noload *eid, int human) {
 	unsigned int i;
-	printf("ns_type\t\t: 0x%-8.8x\n", eid->ns_type);
-	printf("ns_name\t\t: %s\n", eid->ns_name);
-	printf("ns_ver\t\t: 0x%-8.8x\n", eid->ns_ver);
-	printf("ns_num_accels\t: %d\n", eid->ns_num_accels);
-	if (eid->ns_num_accels > 8 || eid->ns_num_accels < 1) {
-		perror("ns_num_accels not valid (must be between 1 and 8)");
-		return;
-	}
-	for (i=0; i < eid->ns_num_accels; ++i) {
-		printf("Accelerator %d:\n", i);
-		eid_show_id_ns_vs_accel(&eid->ns_accels[i], human);
+
+	printf("acc_name\t: %s\n", eid->v4.acc_name);
+	printf("acc_status\t: 0x%-8.8x\n", eid->v4.acc_status);
+	if (human)
+		eid_show_id_ns_vs_status(eid->v4.acc_status);
+	printf("acc_lock\t: 0x%-8.8x", eid->v4.acc_lock);
+	if (human && eid->v4.acc_lock)
+		printf("\tAccelerator is locked with lock 0x%x\n", eid->v4.acc_lock);
+	else if (human && !eid->v4.acc_lock)
+		printf("\tAccelerator is NOT locked\n");
+	else
+		printf("\n");
+	printf("acc_version\t: 0x%-8.8x\n", eid->v4.acc_ver);
+	for (i = 0; i < 24/4; ++i)
+		printf("acc_cfg[%d]\t: 0x%-8.8x\n", i, eid->v4.acc_cfg[i]);
+	printf("acc_spec_bytes\t: %d\n", eid->v4.acc_priv_len);
+	if (eid->v4.acc_priv_len) {
+		printf("acc_user_space\t:\n");
+		d((unsigned char *)eid->v4.acc_priv, eid->v4.acc_priv_len, 16, 1);
 	}
 }
 
-static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int mode, int fmt)
+static void eid_show_id_ns_vs_v6(struct eid_idns_noload *eid, int human) {
+	unsigned int i;
+	
+	printf("ns_type\t\t: 0x%-8.8x\n", eid->v6.ns_type);
+	printf("ns_name\t\t: %s\n", eid->v6.ns_name);
+	printf("ns_ver\t\t: 0x%-8.8x\n", eid->v6.ns_ver);
+	printf("ns_num_accels\t: %d\n", eid->v6.ns_num_accels);
+	if (eid->v6.ns_num_accels > 8 || eid->v6.ns_num_accels < 1) {
+		perror("ns_num_accels not valid (must be between 1 and 8)");
+		return;
+	}
+	for (i=0; i < eid->v6.ns_num_accels; ++i) {
+		printf("Accelerator %d:\n", i);
+		eid_show_id_ns_vs_v6_accel(&eid->v6.ns_accels[i], human);
+	}
+}
+
+static void eid_id_ns_vs(struct eid_idns_noload *eid, __u32 nsid, unsigned int noload_ver, unsigned int mode, int fmt)
 {
 	int human = mode & HUMAN;
 
 	if (fmt == JSON)
-		json_eid_show_id_ns_vs(eid);
+		if (noload_ver == NOLOAD_VER_4)
+			json_eid_show_id_ns_vs_v4(eid);
+		else if (noload_ver == NOLOAD_VER_6)
+			json_eid_show_id_ns_vs_v6(eid);
+		else
+			fprintf(stderr, "error: unrecognized NoLoad version %u", noload_ver); 
 	else {
 		printf("NVME Identify Namespace %d:\n", nsid);
-		eid_show_id_ns_vs(eid, human);
+		if (noload_ver == NOLOAD_VER_4)
+			eid_show_id_ns_vs_v4(eid, human);
+		else if (noload_ver == NOLOAD_VER_6)
+			eid_show_id_ns_vs_v6(eid, human);
+		else
+			fprintf(stderr, "error: unrecognized NoLoad version %u", noload_ver); 
 	}
 }
 
@@ -458,7 +594,7 @@ static int eid_list(int argc, char **argv, struct command *command,
 	}
 
 	if (eid_num > 0)
-		eid_print_list_items(list_items, eid_num);
+		eid_print_list(list_items, eid_num);
 
 	for (i = 0; i < n; i++)
 		free(devices[i]);
@@ -618,7 +754,7 @@ static int eid_id_ns(int argc, char **argv, struct command *command,
 
 	err = nvme_identify_ns(fd, cfg.namespace_id, 0, &ns);
 	if (!err) {
-		eid_id_ns_vs((struct eid_idns_noload *) &ns.vs, cfg.namespace_id, flags, fmt);
+		eid_id_ns_vs((struct eid_idns_noload *) &ns.vs, cfg.namespace_id, get_eid_ver(&temp_list_item), flags, fmt);
 	} else if (err > 0) {
 		fprintf(stderr, "NVMe Status:%s(%x) NSID:%d\n",
 			nvme_status_to_string(err), err, cfg.namespace_id);
