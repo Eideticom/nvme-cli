@@ -58,7 +58,8 @@ struct eid_idns_noload {
 			__le32	ns_type;
 			char	ns_name[48];
 			__le32	ns_ver;
-			char	reserved[196];
+			__le32	ns_features;
+			char	reserved[192];
 			__le32	ns_num_accels;
 			struct eid_idns_accel {
 				__le32	acc_status;
@@ -301,6 +302,7 @@ static void json_eid_show_id_ns_vs_v6(struct eid_idns_noload *eid)
 	json_object_add_value_string(root, "ns_name", eid->v6.ns_name);
 	json_object_add_value_uint(root, "ns_ver", eid->v6.ns_ver);
 	json_object_add_value_uint(root, "ns_num_accels", eid->v6.ns_num_accels);
+	json_object_add_value_uint(root, "ns_features", eid->v6.ns_features);
 
 	if (eid->v6.ns_num_accels > 27 || eid->v6.ns_num_accels < 1) {
 		perror("ns_num_accels not valid (must be between 1 and 27)");
@@ -367,6 +369,7 @@ static void eid_show_id_ns_vs_v6(struct eid_idns_noload *eid, int human) {
 	printf("ns_type\t\t: 0x%-8.8x\n", eid->v6.ns_type);
 	printf("ns_name\t\t: %s\n", eid->v6.ns_name);
 	printf("ns_ver\t\t: 0x%-8.8x\n", eid->v6.ns_ver);
+	printf("ns_features\t: 0x%-8.8x\n", eid->v6.ns_features);
 	printf("ns_num_accels\t: %d\n", eid->v6.ns_num_accels);
 	if (eid->v6.ns_num_accels > 8 || eid->v6.ns_num_accels < 1) {
 		perror("ns_num_accels not valid (must be between 1 and 8)");
